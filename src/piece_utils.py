@@ -89,7 +89,7 @@ def build_piece_list() -> tuple[tuple[tuple[int, int], ...]]:
 
     Returns:
         Tuple of the 1292 valid pieces, sorted by their type and then by location on
-        the board.
+        the board. Each piece is a tuple of four cells.
     """
     cells = list(itertools.product(range(10), range(10)))
     L_pieces = []
@@ -106,27 +106,26 @@ def build_piece_list() -> tuple[tuple[tuple[int, int], ...]]:
             for cell3 in cells:
                 if cell2 >= cell3:
                     continue
-                if taxi_distance(cell1, cell3) > 3:
-                    continue
-                if taxi_distance(cell2, cell3) > 3:
+                if taxi_distance(cell1, cell3) > 3 or taxi_distance(cell2, cell3) > 3:
                     continue
                 for cell4 in cells:
                     if cell3 >= cell4:
                         continue
-                    if taxi_distance(cell1, cell4) > 3:
-                        continue
-                    if taxi_distance(cell2, cell4) > 3:
-                        continue
-                    if taxi_distance(cell3, cell4) > 3:
+                    if (
+                        taxi_distance(cell1, cell4) > 3
+                        or taxi_distance(cell2, cell4) > 3
+                        or taxi_distance(cell3, cell4) > 3
+                    ):
                         continue
                     piece = (cell1, cell2, cell3, cell4)
                     piece_type = get_piece_type(piece)
-                    if piece_type == PieceType.L:
-                        L_pieces.append(piece)
-                    elif piece_type == PieceType.I:
-                        I_pieces.append(piece)
-                    elif piece_type == PieceType.T:
-                        T_pieces.append(piece)
-                    elif piece_type == PieceType.S:
-                        S_pieces.append(piece)
+                    match piece_type:
+                        case PieceType.L:
+                            L_pieces.append(piece)
+                        case PieceType.I:
+                            I_pieces.append(piece)
+                        case PieceType.T:
+                            T_pieces.append(piece)
+                        case PieceType.S:
+                            S_pieces.append(piece)
     return (*L_pieces, *I_pieces, *T_pieces, *S_pieces)

@@ -8,7 +8,7 @@ Battle of LITS is an abstract strategy game developed by Grant Fikes in 2011. Th
 
  - The number of available moves for most of the game is quite high, usually 100-150 during the middlegame. This presents a nice medium between the benchmark games of Chess and Go, but is enough that traversing the game tree at significant depth is quite difficult.
  - The games are quite short, with usually 12-16 pieces played on the board in a game. The result is that only a few moves are necessary for each player before the entire game tree can be explored, even with the high number of available moves.
- - The ruls specify a tiebreaker (the player to play the last piece wins) and that the pie rule should be used, ensuring that the second player always wins with perfect play.
+ - The rules specify a tiebreaker (the player to play the last piece wins) and that the pie rule should be used, ensuring that the second player always wins with perfect play.
 
 ## Improvements over v1
 
