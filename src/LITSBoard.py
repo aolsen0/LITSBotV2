@@ -45,7 +45,15 @@ class LITSBoard:
         )
 
     def play(self, piece_id: int) -> None:
-        pass
+        """Play a piece on the current board.
+
+        The piece is assumed to be legally playable. Modifies the board instance.
+        """
+        self.played_ids.append(piece_id)
+        piece_type = piece_utils.get_piece_type_of_id(piece_id)
+        cells = piece_utils.build_piece_list()[piece_id]
+        for row, col in cells:
+            self._tensor[100 * piece_type.value + 10 * row + col] = 1
 
     def to_tensor(self) -> torch.Tensor:
         return self._tensor
