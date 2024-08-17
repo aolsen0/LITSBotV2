@@ -53,7 +53,7 @@ class LITSBoard:
         piece_type = piece_utils.get_piece_type_of_id(piece_id)
         cells = piece_utils.build_piece_list()[piece_id]
         for row, col in cells:
-            self._tensor[100 * piece_type.value + 10 * row + col] = 1
+            self._tensor[100 * piece_type.value + 10 * row + col] = 1.0
 
     def to_tensor(self) -> torch.Tensor:
         return self._tensor
