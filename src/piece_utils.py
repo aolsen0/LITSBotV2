@@ -57,23 +57,27 @@ def get_piece_type(cells: Collection[tuple[int, int]]) -> PieceType:
     return PieceType.Invalid
 
 
-def get_piece_type_of_id(piece_id: int) -> PieceType:
+def get_piece_type_of_id(piece_id: int, board_size: int = 10) -> PieceType:
     """
-    Returns the type of the piece with the given id.
+    Returns the type of the piece with the given id on the given board size.
     """
-    if piece_id < 576:
+    num_L = 8 * (board_size - 1) * (board_size - 2)
+    num_I = 2 * (board_size - 3) * board_size
+    num_T = 4 * (board_size - 1) * (board_size - 2)
+    num_S = num_T
+    if piece_id < num_L:
         return PieceType.L
-    if piece_id < 716:
+    if piece_id < num_L + num_I:
         return PieceType.I
-    if piece_id < 1004:
+    if piece_id < num_L + num_I + num_T:
         return PieceType.T
-    if piece_id < 1292:
+    if piece_id < num_L + num_I + num_T + num_S:
         return PieceType.S
     return PieceType.Invalid
 
 
 @functools.cache
-def build_piece_list() -> tuple[tuple[tuple[int, int], ...]]:
+def build_piece_list(board_size: int = 10) -> tuple[tuple[tuple[int, int], ...]]:
     """
     Constructs a canonical list of valid pieces and their cells.
 
@@ -91,7 +95,7 @@ def build_piece_list() -> tuple[tuple[tuple[int, int], ...]]:
         Tuple of the 1292 valid pieces, sorted by their type and then by location on
         the board. Each piece is a tuple of four cells.
     """
-    cells = list(itertools.product(range(10), range(10)))
+    cells = list(itertools.product(range(board_size), range(board_size)))
     L_pieces = []
     I_pieces = []
     T_pieces = []

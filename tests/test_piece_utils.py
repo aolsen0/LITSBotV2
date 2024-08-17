@@ -26,8 +26,17 @@ def test_build_piece_list():
     for piece in pieces:
         assert get_piece_type(piece) != PieceType.Invalid
 
+    large_pieces = build_piece_list(20)
+    assert len(large_pieces) == len(set(large_pieces)) == 6152
+    for piece in large_pieces:
+        assert get_piece_type(piece) != PieceType.Invalid
+
 
 def test_get_piece_type_from_id():
     pieces = build_piece_list()
     for i in range(1292):
         assert get_piece_type_of_id(i) == get_piece_type(pieces[i])
+
+    large_pieces = build_piece_list(20)
+    for i in range(6152):
+        assert get_piece_type_of_id(i, 20) == get_piece_type(large_pieces[i])

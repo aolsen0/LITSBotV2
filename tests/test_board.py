@@ -11,6 +11,11 @@ def test_board_construct():
     dense_board = LITSBoard(num_xs=50)
     assert sum(abs(dense_board.to_tensor()[:100])) == 100
 
+    large_board = LITSBoard(board_size=15)
+    large_tensor = large_board.to_tensor()
+    for i in range(225):
+        assert large_tensor[i] + large_tensor[224 - i] == 0.0
+
 
 def test_board_play():
     board = LITSBoard()
@@ -18,10 +23,22 @@ def test_board_play():
     tensor = board.to_tensor()
     assert tensor[100] == tensor[101] == tensor[102] == tensor[110] == 1.0
 
+    large_board = LITSBoard(board_size=15)
+    large_board.play(0)
+    large_tensor = large_board.to_tensor()
+    assert (
+        large_tensor[225]
+        == large_tensor[226]
+        == large_tensor[227]
+        == large_tensor[240]
+        == 1.0
+    )
+
 
 def test_board_valid():
     board = LITSBoard(max_pieces_per_shape=2)
     board.play(0)  # L piece in the top left corner
+    assert not board.is_valid(0)  # the same piece
     assert not board.is_valid(1)  # overlapping L piece
     assert not board.is_valid(576)  # overlapping I piece
     assert board.is_valid(582)  # adjacent I piece

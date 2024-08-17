@@ -22,8 +22,6 @@ class LITSBoard:
             max_pieces_per_shape: Maximum number of pieces of each shape that can be
                 placed on the board.
         """
-        if board_size != 10:
-            raise NotImplementedError("board sizes other than 10 not supported")
         if 2 * num_xs > board_size**2:
             raise ValueError("cannot fit that many symbols on the board")
         self.played_ids = []
@@ -36,6 +34,9 @@ class LITSBoard:
                 row = random.randrange(board_size)
                 col = random.randrange(board_size)
                 if board_tensor[row, col] != 0:
+                    continue
+                # you cant have a symbol in the middle of an odd-length board
+                if row == col == (board_size - 1) / 2:
                     continue
                 board_tensor[row, col] = 1.0
                 board_tensor[board_size - 1 - row, board_size - 1 - col] = -1.0
@@ -53,7 +54,9 @@ class LITSBoard:
         piece_type = piece_utils.get_piece_type_of_id(piece_id)
         cells = piece_utils.build_piece_list()[piece_id]
         for row, col in cells:
-            self._tensor[100 * piece_type.value + 10 * row + col] = 1.0
+            self._tensor[
+                self.board_size**2 * piece_type.value + self.board_size * row + col
+            ] = 1.0
 
     def to_tensor(self) -> torch.Tensor:
         return self._tensor
