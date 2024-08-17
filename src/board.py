@@ -51,8 +51,8 @@ class LITSBoard:
         The piece is assumed to be legally playable. Modifies the board instance.
         """
         self.played_ids.append(piece_id)
-        piece_type = piece_utils.get_piece_type_of_id(piece_id)
-        cells = piece_utils.build_piece_list()[piece_id]
+        piece_type = piece_utils.get_piece_type_of_id(piece_id, self.board_size)
+        cells = piece_utils.build_piece_list(self.board_size)[piece_id]
         for row, col in cells:
             self._tensor[
                 self.board_size**2 * piece_type.value + self.board_size * row + col
@@ -63,16 +63,19 @@ class LITSBoard:
 
     def is_valid(self, new_piece_id: int) -> bool:
         """Check if a piece can be legally played on the current board."""
-        new_piece_type = piece_utils.get_piece_type_of_id(new_piece_id)
+        new_piece_type = piece_utils.get_piece_type_of_id(new_piece_id, self.board_size)
+        if new_piece_type == piece_utils.PieceType.Invalid:
+            raise ValueError("no piece exists with that id")
 
         # Check if we have pieces of this type remaining
         type_counts = collections.Counter(
-            map(piece_utils.get_piece_type_of_id, self.played_ids)
+            piece_utils.get_piece_type_of_id(piece_id, self.board_size)
+            for piece_id in self.played_ids
         )
         if type_counts[new_piece_type] >= self.max_pieces_per_shape:
             return False
 
-        piece_list = piece_utils.build_piece_list()
+        piece_list = piece_utils.build_piece_list(self.board_size)
         new_cells = piece_list[new_piece_id]
         # Check that the piece does not intersect already played pieces
         played_cells = set(
@@ -94,7 +97,10 @@ class LITSBoard:
 
         # Check that the piece is not adjacent to another piece of the same type
         for played_id in self.played_ids:
-            if piece_utils.get_piece_type_of_id(played_id) == new_piece_type:
+            if (
+                piece_utils.get_piece_type_of_id(played_id, self.board_size)
+                == new_piece_type
+            ):
                 for new_cell in new_cells:
                     for cell in piece_list[played_id]:
                         distance = piece_utils.taxi_distance(cell, new_cell)
