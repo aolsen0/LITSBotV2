@@ -5,7 +5,6 @@ import random
 import colorama
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from src import piece_utils
 
