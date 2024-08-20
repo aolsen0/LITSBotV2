@@ -35,7 +35,7 @@ def test_board_play():
     )
 
 
-def test_board_valid():
+def test_board_is_valid():
     board = LITSBoard(board_size=15, max_pieces_per_shape=2)
     board.play(0)  # L piece in the top left corner
     assert not board.is_valid(0)  # the same piece
@@ -55,3 +55,14 @@ def test_board_valid():
     )  # S piece making a 2x2 square with both played pieces
     board.play(1488)
     assert not board.is_valid(1511)  # 3rd I piece, of which no more are available
+
+
+def test_board_valid_moves():
+    board = LITSBoard(max_pieces_per_shape=1)
+    assert len(board.valid_moves()) == 1292
+    board.play(0)
+    # 0 L, 6 I, 8 T, 8 S
+    assert len(board.valid_moves()) == 22
+    board.play(582)
+    # 0 L, 0 I, 20 T, 16 S
+    assert len(board.valid_moves()) == 36

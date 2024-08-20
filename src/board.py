@@ -66,6 +66,9 @@ class LITSBoard:
         new_piece_type = piece_utils.get_piece_type_of_id(new_piece_id, self.board_size)
         if new_piece_type == piece_utils.PieceType.Invalid:
             raise ValueError("no piece exists with that id")
+        # Can play any move to start the game
+        if len(self.played_ids) == 0:
+            return True
 
         # Check if we have pieces of this type remaining
         type_counts = collections.Counter(
@@ -124,7 +127,12 @@ class LITSBoard:
         return True
 
     def valid_moves(self) -> list[int]:
-        pass
+        """Return a list of all piece ids which can currently be played."""
+        legal = []
+        for i in range(len(piece_utils.build_piece_list(self.board_size))):
+            if self.is_valid(i):
+                legal.append(i)
+        return legal
 
     def to_children_tensor(self) -> torch.Tensor:
         pass
