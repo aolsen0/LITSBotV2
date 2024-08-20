@@ -3,16 +3,16 @@ from src.board import LITSBoard
 
 def test_board_construct():
     board = LITSBoard()
-    tensor = board.to_tensor()
+    tensor = board.to_tensor().flatten()
     # the board should be rotationally symmetric
     for i in range(100):
         assert tensor[i] + tensor[99 - i] == 0.0
-    assert sum(abs(board.to_tensor()[:100])) == 60
+    assert sum(abs(board.to_tensor().flatten()[:100])) == 60
     dense_board = LITSBoard(num_xs=50)
-    assert sum(abs(dense_board.to_tensor()[:100])) == 100
+    assert sum(abs(dense_board.to_tensor().flatten()[:100])) == 100
 
     large_board = LITSBoard(board_size=15)
-    large_tensor = large_board.to_tensor()
+    large_tensor = large_board.to_tensor().flatten()
     for i in range(225):
         assert large_tensor[i] + large_tensor[224 - i] == 0.0
 
@@ -20,12 +20,12 @@ def test_board_construct():
 def test_board_play():
     board = LITSBoard()
     board.play(0)
-    tensor = board.to_tensor()
+    tensor = board.to_tensor().flatten()
     assert tensor[100] == tensor[101] == tensor[102] == tensor[110] == 1.0
 
     large_board = LITSBoard(board_size=15)
     large_board.play(1456)
-    large_tensor = large_board.to_tensor()
+    large_tensor = large_board.to_tensor().flatten()
     assert (
         large_tensor[450]
         == large_tensor[451]

@@ -44,9 +44,11 @@ class LITSBoard:
                 board_tensor[row, col] = 1.0
                 board_tensor[board_size - 1 - row, board_size - 1 - col] = -1.0
                 break
-        self._tensor = F.pad(
-            board_tensor.reshape(board_size**2), (0, 4 * board_size**2 + 1)
-        )
+        self._board_tensor = board_tensor
+        self._piece_tensors = {
+            piece_type: torch.zeros(board_size, board_size)
+            for piece_type in piece_utils.PieceType.all_values()
+        }
 
     def play(self, piece_id: int) -> None:
         """Play a piece on the current board.
@@ -57,12 +59,10 @@ class LITSBoard:
         piece_type = piece_utils.get_piece_type_of_id(piece_id, self.board_size)
         cells = piece_utils.build_piece_list(self.board_size)[piece_id]
         for row, col in cells:
-            self._tensor[
-                self.board_size**2 * piece_type.value + self.board_size * row + col
-            ] = 1.0
+            self._piece_tensors[piece_type][row, col] = 1.0
 
     def to_tensor(self) -> torch.Tensor:
-        return self._tensor
+        return torch.stack([self._board_tensor, *self._piece_tensors.values()])
 
     def is_valid(self, new_piece_id: int) -> bool:
         """Check if a piece can be legally played on the current board."""
@@ -139,25 +139,25 @@ class LITSBoard:
 
     def __str__(self) -> str:
         os.system("color")
-        layer_size = self.board_size**2
-        board_str = np.full(layer_size, " ", dtype=np.dtypes.StrDType)
-        board_str[self._tensor[:layer_size] > 0] = "X"
-        board_str[self._tensor[:layer_size] < 0] = "O"
-        board_str[self._tensor[layer_size : 2 * layer_size] > 0] = (
+        board_str = np.full(
+            [self.board_size, self.board_size], " ", dtype=np.dtypes.StrDType
+        )
+        board_str[self._board_tensor > 0] = "X"
+        board_str[self._board_tensor < 0] = "O"
+
+        board_str[self._piece_tensors[piece_utils.PieceType.L] > 0] = (
             f"{colorama.Fore.RED}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._tensor[2 * layer_size : 3 * layer_size] > 0] = (
+        board_str[self._piece_tensors[piece_utils.PieceType.I] > 0] = (
             f"{colorama.Fore.YELLOW}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._tensor[3 * layer_size : 4 * layer_size] > 0] = (
+        board_str[self._piece_tensors[piece_utils.PieceType.T] > 0] = (
             f"{colorama.Fore.GREEN}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._tensor[4 * layer_size : 5 * layer_size] > 0] = (
+        board_str[self._piece_tensors[piece_utils.PieceType.S] > 0] = (
             f"{colorama.Fore.CYAN}■{colorama.Style.RESET_ALL}"
         )
-        rows = [
-            " ".join(row) for row in board_str.reshape(self.board_size, self.board_size)
-        ]
+        rows = [" ".join(row) for row in board_str]
         return ("\n").join(rows)
 
     def to_children_tensor(self) -> torch.Tensor:

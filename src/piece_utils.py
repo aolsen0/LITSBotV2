@@ -11,6 +11,10 @@ class PieceType(enum.Enum):
     S = 4
     Invalid = 5
 
+    @staticmethod
+    def all_values() -> list["PieceType"]:
+        return [PieceType.L, PieceType.I, PieceType.T, PieceType.S]
+
 
 def taxi_distance(cell1: tuple[int, int], cell2: tuple[int, int]) -> int:
     """
