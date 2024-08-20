@@ -1,6 +1,9 @@
 import collections
 import itertools
+import os
 import random
+import colorama
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -133,6 +136,29 @@ class LITSBoard:
             if self.is_valid(i):
                 legal.append(i)
         return legal
+
+    def __str__(self) -> str:
+        os.system("color")
+        layer_size = self.board_size**2
+        board_str = np.full(layer_size, " ", dtype=np.dtypes.StrDType)
+        board_str[self._tensor[:layer_size] > 0] = "X"
+        board_str[self._tensor[:layer_size] < 0] = "O"
+        board_str[self._tensor[layer_size : 2 * layer_size] > 0] = (
+            f"{colorama.Fore.RED}■{colorama.Style.RESET_ALL}"
+        )
+        board_str[self._tensor[2 * layer_size : 3 * layer_size] > 0] = (
+            f"{colorama.Fore.YELLOW}■{colorama.Style.RESET_ALL}"
+        )
+        board_str[self._tensor[3 * layer_size : 4 * layer_size] > 0] = (
+            f"{colorama.Fore.GREEN}■{colorama.Style.RESET_ALL}"
+        )
+        board_str[self._tensor[4 * layer_size : 5 * layer_size] > 0] = (
+            f"{colorama.Fore.CYAN}■{colorama.Style.RESET_ALL}"
+        )
+        rows = [
+            " ".join(row) for row in board_str.reshape(self.board_size, self.board_size)
+        ]
+        return ("\n").join(rows)
 
     def to_children_tensor(self) -> torch.Tensor:
         pass

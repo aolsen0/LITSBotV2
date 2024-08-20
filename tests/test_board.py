@@ -66,3 +66,13 @@ def test_board_valid_moves():
     board.play(582)
     # 0 L, 0 I, 20 T, 16 S
     assert len(board.valid_moves()) == 36
+
+
+def test_board_str():
+    board = LITSBoard(board_size=15)
+    board_str = str(board)
+    assert board_str.count("X") == 30
+    assert board_str.count("\n") == 14
+    board.play(0)
+    board_str = str(board)
+    assert board_str.count("■") == 4
