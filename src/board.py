@@ -5,7 +5,12 @@ import colorama
 import numpy as np
 import torch
 
-from src import piece_utils
+from src.piece_utils import (
+    PieceType,
+    build_piece_list,
+    get_piece_type_of_id,
+    taxi_distance,
+)
 
 
 class LITSBoard:
@@ -45,7 +50,7 @@ class LITSBoard:
         self._board_tensor = board_tensor
         self._piece_tensors = {
             piece_type: torch.zeros(board_size, board_size)
-            for piece_type in piece_utils.PieceType.all_values()
+            for piece_type in PieceType.all_values()
         }
 
     def play(self, piece_id: int) -> None:
@@ -54,8 +59,8 @@ class LITSBoard:
         The piece is assumed to be legally playable. Modifies the board instance.
         """
         self.played_ids.append(piece_id)
-        piece_type = piece_utils.get_piece_type_of_id(piece_id, self.board_size)
-        cells = piece_utils.build_piece_list(self.board_size)[piece_id]
+        piece_type = get_piece_type_of_id(piece_id, self.board_size)
+        cells = build_piece_list(self.board_size)[piece_id]
         for row, col in cells:
             self._piece_tensors[piece_type][row, col] = 1.0
 
@@ -64,8 +69,8 @@ class LITSBoard:
 
     def is_valid(self, new_piece_id: int) -> bool:
         """Check if a piece can be legally played on the current board."""
-        new_piece_type = piece_utils.get_piece_type_of_id(new_piece_id, self.board_size)
-        if new_piece_type == piece_utils.PieceType.Invalid:
+        new_piece_type = get_piece_type_of_id(new_piece_id, self.board_size)
+        if new_piece_type == PieceType.Invalid:
             raise ValueError("no piece exists with that id")
         # Can play any move to start the game
         if len(self.played_ids) == 0:
@@ -73,13 +78,13 @@ class LITSBoard:
 
         # Check if we have pieces of this type remaining
         type_counts = collections.Counter(
-            piece_utils.get_piece_type_of_id(piece_id, self.board_size)
+            get_piece_type_of_id(piece_id, self.board_size)
             for piece_id in self.played_ids
         )
         if type_counts[new_piece_type] >= self.max_pieces_per_shape:
             return False
 
-        piece_list = piece_utils.build_piece_list(self.board_size)
+        piece_list = build_piece_list(self.board_size)
         new_cells = piece_list[new_piece_id]
         # Check that the piece does not intersect already played pieces
         played_cells = set(
@@ -91,7 +96,7 @@ class LITSBoard:
         # Check that the piece is adjacent to a previously played piece
         for cell in played_cells:
             for new_cell in new_cells:
-                if piece_utils.taxi_distance(cell, new_cell) == 1:
+                if taxi_distance(cell, new_cell) == 1:
                     break
             else:
                 continue
@@ -101,13 +106,10 @@ class LITSBoard:
 
         # Check that the piece is not adjacent to another piece of the same type
         for played_id in self.played_ids:
-            if (
-                piece_utils.get_piece_type_of_id(played_id, self.board_size)
-                == new_piece_type
-            ):
+            if get_piece_type_of_id(played_id, self.board_size) == new_piece_type:
                 for new_cell in new_cells:
                     for cell in piece_list[played_id]:
-                        distance = piece_utils.taxi_distance(cell, new_cell)
+                        distance = taxi_distance(cell, new_cell)
                         assert distance != 0
                         if distance == 1:
                             return False
@@ -130,7 +132,7 @@ class LITSBoard:
     def valid_moves(self) -> list[int]:
         """Return a list of all piece ids which can currently be played."""
         legal = []
-        for i in range(len(piece_utils.build_piece_list(self.board_size))):
+        for i in range(len(build_piece_list(self.board_size))):
             if self.is_valid(i):
                 legal.append(i)
         return legal
@@ -142,16 +144,16 @@ class LITSBoard:
         board_str[self._board_tensor > 0] = "X"
         board_str[self._board_tensor < 0] = "O"
 
-        board_str[self._piece_tensors[piece_utils.PieceType.L] > 0] = (
+        board_str[self._piece_tensors[PieceType.L] > 0] = (
             f"{colorama.Fore.RED}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._piece_tensors[piece_utils.PieceType.I] > 0] = (
+        board_str[self._piece_tensors[PieceType.I] > 0] = (
             f"{colorama.Fore.YELLOW}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._piece_tensors[piece_utils.PieceType.T] > 0] = (
+        board_str[self._piece_tensors[PieceType.T] > 0] = (
             f"{colorama.Fore.GREEN}■{colorama.Style.RESET_ALL}"
         )
-        board_str[self._piece_tensors[piece_utils.PieceType.S] > 0] = (
+        board_str[self._piece_tensors[PieceType.S] > 0] = (
             f"{colorama.Fore.CYAN}■{colorama.Style.RESET_ALL}"
         )
         rows = [" ".join(row) for row in board_str]
@@ -159,12 +161,12 @@ class LITSBoard:
 
     def _tensor_after_playing_piece(self, piece_id: int) -> torch.Tensor:
         """Return the hypothetical board tensor after playing the given piece."""
-        new_piece_type = piece_utils.get_piece_type_of_id(piece_id, self.board_size)
+        new_piece_type = get_piece_type_of_id(piece_id, self.board_size)
         to_stack = [self._board_tensor]
         for piece_type, piece_tensor in self._piece_tensors.items():
             if piece_type == new_piece_type:
                 piece_tensor = piece_tensor.clone()
-                cells = piece_utils.build_piece_list(self.board_size)[piece_id]
+                cells = build_piece_list(self.board_size)[piece_id]
                 for row, col in cells:
                     piece_tensor[row, col] = 1.0
             to_stack.append(piece_tensor)
