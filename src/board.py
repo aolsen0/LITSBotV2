@@ -137,9 +137,8 @@ class LITSBoard:
         return legal
 
     def __str__(self) -> str:
-        os.system("color")
         board_str = np.full(
-            [self.board_size, self.board_size], " ", dtype=np.dtypes.StrDType
+            [self.board_size, self.board_size], " ", dtype=np.dtypes.StringDType
         )
         board_str[self._board_tensor > 0] = "X"
         board_str[self._board_tensor < 0] = "O"
