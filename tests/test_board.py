@@ -76,3 +76,22 @@ def test_board_str():
     board.play(0)
     board_str = str(board)
     assert board_str.count("■") == 4
+
+
+def test_board_to_children_tensor():
+    board = LITSBoard(board_size=15)
+    tensor = board.to_children_tensor([0, 1462, 1488])
+    assert tensor.shape == (3, 5, 15, 15)
+    assert tensor.sum([2, 3]).tolist() == [
+        [0.0, 4.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 4.0, 0.0, 0.0],
+        [0.0, 0.0, 4.0, 0.0, 0.0],
+    ]
+    board.play(0)
+    assert board.to_tensor().equal(tensor[0])
+    new_tensor = board.to_children_tensor([1462, 2604])
+    assert new_tensor.shape == (2, 5, 15, 15)
+    assert new_tensor.sum([2, 3]).tolist() == [
+        [0.0, 4.0, 4.0, 0.0, 0.0],
+        [0.0, 4.0, 0.0, 0.0, 4.0],
+    ]

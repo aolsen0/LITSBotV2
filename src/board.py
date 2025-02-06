@@ -157,5 +157,30 @@ class LITSBoard:
         rows = [" ".join(row) for row in board_str]
         return ("\n").join(rows)
 
-    def to_children_tensor(self) -> torch.Tensor:
-        pass
+    def _tensor_after_playing_piece(self, piece_id: int) -> torch.Tensor:
+        """Return the hypothetical board tensor after playing the given piece."""
+        new_piece_type = piece_utils.get_piece_type_of_id(piece_id, self.board_size)
+        to_stack = [self._board_tensor]
+        for piece_type, piece_tensor in self._piece_tensors.items():
+            if piece_type == new_piece_type:
+                piece_tensor = piece_tensor.clone()
+                cells = piece_utils.build_piece_list(self.board_size)[piece_id]
+                for row, col in cells:
+                    piece_tensor[row, col] = 1.0
+            to_stack.append(piece_tensor)
+        return torch.stack(to_stack)
+
+    def to_children_tensor(self, pieces_to_use: list[int]) -> torch.Tensor:
+        """Return the tensor representing all possible board states after the given
+        pieces are played.
+
+        Args:
+            pieces_to_use: List of piece ids to consider playing.
+        Returns:
+            Tensor of shape (len(pieces_to_use), 5, board_size, board_size) representing
+            the board states after each piece is played.
+        """
+        children = []
+        for piece_id in pieces_to_use:
+            children.append(self._tensor_after_playing_piece(piece_id))
+        return torch.stack(children)
