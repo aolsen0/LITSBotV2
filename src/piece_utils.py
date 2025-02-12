@@ -41,7 +41,7 @@ def get_piece_type(cells: Collection[tuple[int, int]]) -> PieceType:
         a single piece.
     """
     # We can determine the piece type by looking only at the pairwise euclidean
-    # distances. It is left as an exercise ot the reader that no non-pieces can have
+    # distances. It is left as an exercise for the reader that no non-pieces can have
     # these pairwise distances.
     if len(cells) != 4:
         raise ValueError("Can only check the piece type of a collection of 4 cells")
@@ -69,6 +69,8 @@ def get_piece_type_of_id(piece_id: int, board_size: int = 10) -> PieceType:
     num_I = 2 * (board_size - 3) * board_size
     num_T = 4 * (board_size - 1) * (board_size - 2)
     num_S = num_T
+    if piece_id < 0:
+        return PieceType.Invalid
     if piece_id < num_L:
         return PieceType.L
     if piece_id < num_L + num_I:
@@ -88,16 +90,25 @@ def build_piece_list(board_size: int = 10) -> tuple[tuple[tuple[int, int], ...]]
     Pieces should almost always be referred to by their index within this list and not
     their underlying cells for the sake of efficiency.
 
-    There are 1292 total pieces:
+    There are 1292 total pieces on a 10x10 board:
      - 576 L pieces. These have 4 rotations, 2 reflections, and 72 placements for each
         orientation.
      - 140 I pieces. These have 2 rotations and 70 placements each.
      - 288 T pieces. These have 4 rotations and 72 placements each.
      - 288 S pieces. These have 2 rotations, 2 reflections and 72 placements each.
 
+    For a board with size n, there are:
+     - 8 * (n - 1) * (n - 2) L pieces
+     - 2 * (n - 3) * n       I pieces
+     - 4 * (n - 1) * (n - 2) T pieces
+     - 4 * (n - 1) * (n - 2) S pieces
+
+    Args:
+        board_size: The size of the board to generate pieces for.
+
     Returns:
-        Tuple of the 1292 valid pieces, sorted by their type and then by location on
-        the board. Each piece is a tuple of four cells.
+        Tuple of the valid pieces, sorted by their type and then by location on
+        the board. Each piece is a tuple of four cells of the form (row, col).
     """
     cells = list(itertools.product(range(board_size), range(board_size)))
     L_pieces = []
