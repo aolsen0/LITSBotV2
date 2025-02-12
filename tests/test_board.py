@@ -72,7 +72,7 @@ def test_board_str():
     board = LITSBoard(board_size=15)
     board_str = str(board)
     assert board_str.count("X") == 30
-    assert board_str.count("\n") == 14
+    assert board_str.count("\n") == 17
     board.play(0)
     board_str = str(board)
     assert board_str.count("■") == 4

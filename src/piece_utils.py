@@ -137,3 +137,12 @@ def build_piece_list(board_size: int = 10) -> tuple[tuple[tuple[int, int], ...]]
                         case PieceType.S:
                             S_pieces.append(piece)
     return (*L_pieces, *I_pieces, *T_pieces, *S_pieces)
+
+
+@functools.cache
+def map_cells_to_id(board_size: int = 10) -> dict[tuple[tuple[int, int]], int]:
+    """
+    Returns a mapping from the cells of each piece to the id of that piece.
+    """
+    piece_list = build_piece_list(board_size)
+    return {piece: i for i, piece in enumerate(piece_list)}

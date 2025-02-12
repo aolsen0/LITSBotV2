@@ -156,8 +156,16 @@ class LITSBoard:
         board_str[self._piece_tensors[PieceType.S] > 0] = (
             f"{colorama.Fore.CYAN}■{colorama.Style.RESET_ALL}"
         )
-        rows = [" ".join(row) for row in board_str]
-        return ("\n").join(rows)
+        header = [
+            "     " + " ".join(chr(i + ord("A")) for i in range(self.board_size)),
+            "    " + "–" * (2 * self.board_size + 1),
+        ]
+        rows = [
+            f"{str(i + 1).rjust(2)} | " + " ".join(row) + " |"
+            for i, row in enumerate(board_str)
+        ]
+        footer = header[1:]
+        return ("\n").join(header + rows + footer)
 
     def _tensor_after_playing_piece(self, piece_id: int) -> torch.Tensor:
         """Return the hypothetical board tensor after playing the given piece."""
