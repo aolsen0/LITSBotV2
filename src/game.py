@@ -49,6 +49,28 @@ class LITSGame:
         if not self.board.valid_moves():
             self.completed = True
 
+    def score(self) -> float:
+        """Return the current score of the game from the perspective of the first
+        player.
+
+        If the game is in progress or the players finish with differeny scores, this is
+        the difference between the number of uncovered Xs and Os. If the game is
+        finished and the players finish with the same score, this is ±0.5, depending on
+        who played last (as the player who played last wins in case of a tie).
+        """
+        tensor = self.board.to_tensor()
+        covered = tensor[1:].sum(axis=0)
+        print(covered)
+        symbols = tensor[0].clone()
+        symbols[covered > 0] = 0.0
+        print(symbols)
+        score = symbols.sum().item()
+        if self.swapped:
+            score = -score
+        if self.completed and score == 0.0:
+            return -0.5 if self.current_player == 0 else 0.5
+        return score
+
     def is_swappable(self) -> bool:
         """Return whether the current player can swap sides."""
         return self.current_player == 1 and len(self.board.played_ids) == 1
@@ -63,7 +85,7 @@ class LITSGame:
         if self.is_swappable():
             print("Do you want to swap sides? (y/n)")
             response = input()
-            if response == "y":
+            if response.lower() == "y":
                 self.play(-1)
                 return
         print("Enter the cells of the piece you want to play")

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 import pytest
+import torch
 from src.game import LITSGame
 
 
@@ -23,6 +24,38 @@ def test_game_play():
 
     with pytest.raises(ValueError):
         game.play(0)
+
+
+def test_game_score():
+    game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+    game.board._board_tensor = torch.tensor(
+        [
+            [0.0, -1.0, 0.0, -1.0],
+            [-1.0, 0.0, 1.0, 0.0],
+            [0.0, -1.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0, 0.0],
+        ]
+    )
+    assert game.score() == 0.0
+    game.play(0)
+    assert game.score() == 2.0
+    game.play(-1)
+    assert game.score() == -2.0
+    game.play(98)
+    assert game.score() == 0.5
+
+    game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+    game.board._board_tensor = torch.tensor(
+        [
+            [0.0, -1.0, 0.0, -1.0],
+            [-1.0, 0.0, 1.0, 0.0],
+            [0.0, -1.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0, 0.0],
+        ]
+    )
+    game.play(0)
+    game.play(72)
+    assert game.score() == 1.0
 
 
 @patch("builtins.input")
