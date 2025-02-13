@@ -64,7 +64,9 @@ class LITSBoard:
         for row, col in cells:
             self._piece_tensors[piece_type][row, col] = 1.0
 
-    def to_tensor(self) -> torch.Tensor:
+    def to_tensor(self, flip_xo: bool = False) -> torch.Tensor:
+        if flip_xo:
+            return torch.stack([-self._board_tensor, *self._piece_tensors.values()])
         return torch.stack([self._board_tensor, *self._piece_tensors.values()])
 
     def is_valid(self, new_piece_id: int) -> bool:
@@ -167,10 +169,12 @@ class LITSBoard:
         footer = header[1:]
         return ("\n").join(header + rows + footer)
 
-    def _tensor_after_playing_piece(self, piece_id: int) -> torch.Tensor:
+    def _tensor_after_playing_piece(
+        self, piece_id: int, flip_xo: bool = True
+    ) -> torch.Tensor:
         """Return the hypothetical board tensor after playing the given piece."""
         new_piece_type = get_piece_type_of_id(piece_id, self.board_size)
-        to_stack = [self._board_tensor]
+        to_stack = [-self._board_tensor] if flip_xo else [self._board_tensor]
         for piece_type, piece_tensor in self._piece_tensors.items():
             if piece_type == new_piece_type:
                 piece_tensor = piece_tensor.clone()
@@ -180,7 +184,9 @@ class LITSBoard:
             to_stack.append(piece_tensor)
         return torch.stack(to_stack)
 
-    def to_children_tensor(self, pieces_to_use: list[int]) -> torch.Tensor:
+    def to_children_tensor(
+        self, pieces_to_use: list[int], flip_xo: bool = True
+    ) -> torch.Tensor:
         """Return the tensor representing all possible board states after the given
         pieces are played.
 
@@ -192,5 +198,5 @@ class LITSBoard:
         """
         children = []
         for piece_id in pieces_to_use:
-            children.append(self._tensor_after_playing_piece(piece_id))
+            children.append(self._tensor_after_playing_piece(piece_id, flip_xo))
         return torch.stack(children)

@@ -80,7 +80,7 @@ def test_board_str():
 
 def test_board_to_children_tensor():
     board = LITSBoard(board_size=15)
-    tensor = board.to_children_tensor([0, 1462, 1488])
+    tensor = board.to_children_tensor([0, 1462, 1488], flip_xo=False)
     assert tensor.shape == (3, 5, 15, 15)
     assert tensor.sum([2, 3]).tolist() == [
         [0.0, 4.0, 0.0, 0.0, 0.0],
@@ -95,3 +95,4 @@ def test_board_to_children_tensor():
         [0.0, 4.0, 4.0, 0.0, 0.0],
         [0.0, 4.0, 0.0, 0.0, 4.0],
     ]
+    assert tensor[0, 0].equal(-new_tensor[0, 0])

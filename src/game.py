@@ -1,3 +1,7 @@
+import random
+import torch
+import torch.nn as nn
+
 from src.board import LITSBoard
 from src.piece_utils import map_cells_to_id
 
@@ -60,10 +64,8 @@ class LITSGame:
         """
         tensor = self.board.to_tensor()
         covered = tensor[1:].sum(axis=0)
-        print(covered)
         symbols = tensor[0].clone()
         symbols[covered > 0] = 0.0
-        print(symbols)
         score = symbols.sum().item()
         if self.swapped:
             score = -score
@@ -111,3 +113,50 @@ class LITSGame:
                 "Invalid input, try again. Input should be four cells, in the format "
                 "'A 1 B 1 C 1 D 1'"
             )
+
+    def generate_examples(
+        self, model: nn.Module, epsilon: float = 0.2
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generate examples for training a reinforcement learning model.
+
+        Args:
+            model: The model to generate examples for.
+            epsilon: The probability of choosing a random move instead of the best move.
+        Returns:
+            A list of examples, each of the form (board_tensor, move_tensor, value).
+        """
+        if self.board.played_ids:
+            raise ValueError("Cannot generate examples for a game in progress")
+
+        # don't generate examples for the first move
+        if random.random() < epsilon:
+            piece_id = random.choice(self.board.valid_moves())
+        else:
+            children_tensor = self.board.to_children_tensor(self.board.valid_moves())
+            with torch.no_grad():
+                values = model(children_tensor)
+            piece_id = values.abs().argmin().item()
+        self.play(piece_id)
+
+        inputs = []
+        outputs = []
+        while not self.completed:
+            flip = bool(len(self.board.played_ids) % 2)
+            inputs.append(self.board.to_tensor(flip))
+            moves = self.board.valid_moves()
+            children_tensor = self.board.to_children_tensor(moves, not flip)
+            with torch.no_grad():
+                values = model(children_tensor)
+            outputs.append(-values.min().item())
+            if random.random() < epsilon:
+                piece_id = random.choice(moves)
+            else:
+                piece_id = moves[values.abs().argmin().item()]
+            self.play(piece_id)
+
+        # add the final state
+        flip = bool(len(self.board.played_ids) % 2)
+        inputs.append(self.board.to_tensor(flip))
+        outputs.append(-self.score() if flip else self.score())
+
+        return torch.stack(inputs), torch.tensor(outputs).unsqueeze(1)
