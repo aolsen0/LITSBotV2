@@ -3,10 +3,20 @@ import torch.nn as nn
 
 
 class LITSModel(nn.Module):
-    def __init__(self, board_size: int, num_conv_layers: int, num_linear_layers: int):
+    def __init__(
+        self,
+        board_size: int,
+        num_xs: int,
+        max_pieces_per_shape: int,
+        num_conv_layers: int,
+        num_linear_layers: int,
+    ):
         if num_conv_layers == 0 and num_linear_layers == 0:
             raise ValueError("Model must have at least one layer")
         super().__init__()
+        self.board_size = board_size
+        self.num_xs = num_xs
+        self.max_pieces_per_shape = max_pieces_per_shape
         conv_layers = []
         for i in range(num_conv_layers):
             if i == 0:
