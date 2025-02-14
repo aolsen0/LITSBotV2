@@ -1,6 +1,7 @@
 from src.piece_utils import (
     PieceType,
     build_piece_list,
+    get_piece_tensor,
     get_piece_type,
     get_piece_type_of_id,
 )
@@ -40,3 +41,20 @@ def test_get_piece_type_from_id():
     large_pieces = build_piece_list(20)
     for i in range(6152):
         assert get_piece_type_of_id(i, 20) == get_piece_type(large_pieces[i])
+
+
+def test_get_piece_tensor():
+    a = get_piece_tensor(0, 4)
+    assert a.shape == (5, 4, 4)
+    assert a.sum() == 4.0
+    assert a[1, 0, 0] == 1.0
+    assert a[1, 0, 1] == 1.0
+    assert a[1, 1, 0] == 1.0
+    assert a[1, 0, 2] == 1.0
+
+    b = get_piece_tensor(51, 4)
+    assert b.sum() == 4.0
+    assert b[2, 0, 2] == 1.0
+    assert b[2, 1, 2] == 1.0
+    assert b[2, 2, 2] == 1.0
+    assert b[2, 3, 2] == 1.0
