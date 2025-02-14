@@ -132,9 +132,11 @@ class LITSGame:
         if random.random() < epsilon:
             piece_id = random.choice(self.board.valid_moves())
         else:
-            children_tensor = self.board.to_children_tensor(self.board.valid_moves())
+            children_tensor, score_changes = self.board.to_children_tensor(
+                self.board.valid_moves()
+            )
             with torch.no_grad():
-                values = model(children_tensor)
+                values = model(children_tensor) - score_changes.unsqueeze(1)
             piece_id = values.abs().argmin().item()
         self.play(piece_id)
 
@@ -144,19 +146,22 @@ class LITSGame:
             flip = bool(len(self.board.played_ids) % 2)
             inputs.append(self.board.to_tensor(flip))
             moves = self.board.valid_moves()
-            children_tensor = self.board.to_children_tensor(moves, not flip)
+            children_tensor, score_changes = self.board.to_children_tensor(
+                moves, not flip
+            )
             with torch.no_grad():
-                values = model(children_tensor)
+                values = model(children_tensor) - score_changes.unsqueeze(1)
             outputs.append(-values.min().item())
             if random.random() < epsilon:
                 piece_id = random.choice(moves)
             else:
-                piece_id = moves[values.abs().argmin().item()]
+                piece_id = moves[values.argmin().item()]
             self.play(piece_id)
 
         # add the final state
         flip = bool(len(self.board.played_ids) % 2)
         inputs.append(self.board.to_tensor(flip))
-        outputs.append(-self.score() if flip else self.score())
+        value = -self.score() if flip else self.score()
+        outputs.append(1.0 if value > 0 else -1.0)
 
         return torch.stack(inputs), torch.tensor(outputs).unsqueeze(1)

@@ -3,6 +3,8 @@ import enum
 import functools
 import itertools
 
+import torch
+
 
 class PieceType(enum.Enum):
     L = 1
@@ -157,3 +159,17 @@ def map_cells_to_id(board_size: int = 10) -> dict[tuple[tuple[int, int]], int]:
     """
     piece_list = build_piece_list(board_size)
     return {piece: i for i, piece in enumerate(piece_list)}
+
+
+@functools.cache
+def get_piece_tensor(piece_id: int, board_size: int = 10) -> torch.Tensor:
+    """
+    Returns a tensor representing the given piece.
+    """
+    piece_type = get_piece_type_of_id(piece_id, board_size)
+    piece_list = build_piece_list(board_size)
+    piece = piece_list[piece_id]
+    tensor = torch.zeros(5, board_size, board_size)
+    for row, col in piece:
+        tensor[piece_type.value, row, col] = 1.0
+    return tensor

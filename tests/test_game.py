@@ -83,7 +83,7 @@ def test_generate_examples():
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
 
     def model(tensor):
-        return -torch.tensor([list(range(tensor.shape[0]))]).T
+        return -5 * torch.tensor([list(range(tensor.shape[0]))]).T
 
     real_board = torch.tensor(
         [
@@ -98,21 +98,18 @@ def test_generate_examples():
     example_in, example_out = game.generate_examples(model, 0.0)
     assert example_in.shape == (3, 5, 4, 4)
     assert example_out.shape == (3, 1)
-    assert example_out.tolist() == [[9], [3], [-3]]
+    assert example_out.tolist() == [[45], [0], [-1]]
     assert example_in[0, 0].equal(-real_board)
     assert example_in[1, 0].equal(real_board)
     assert example_in[2, 0].equal(-real_board)
     assert example_in[1, 1:].sum(axis=0).tolist() == [
-        [1.0, 1.0, 1.0, 1.0],
-        [1.0, 0.0, 0.0, 1.0],
-        [0.0, 0.0, 0.0, 1.0],
-        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 1.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 1.0, 1.0, 0.0],
     ]
 
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
-
-    def model(tensor):
-        return -torch.tensor([list(range(tensor.shape[0]))]).T
 
     real_board = torch.tensor(
         [
