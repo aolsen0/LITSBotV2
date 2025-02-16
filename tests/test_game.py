@@ -82,9 +82,10 @@ def test_game_prompt(input_mock):
 
 def test_generate_examples():
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def model(tensor):
-        return -5 * torch.tensor([list(range(tensor.shape[0]))]).T
+        return -5 * torch.tensor([list(range(tensor.shape[0]))]).to(device).T
 
     real_board = torch.tensor(
         [

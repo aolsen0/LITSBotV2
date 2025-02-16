@@ -5,6 +5,8 @@ import torch.nn as nn
 from src.board import LITSBoard
 from src.piece_utils import map_cells_to_id
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class LITSGame:
     """Represents the full game state of a game of battle of LITS"""
@@ -119,6 +121,8 @@ class LITSGame:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate examples for training a reinforcement learning model.
 
+        This assumes that the model is on cuda if available.
+
         Args:
             model: The model to generate examples for.
             epsilon: The probability of choosing a random move instead of the best move.
@@ -139,7 +143,9 @@ class LITSGame:
                 self.board.valid_moves()
             )
             with torch.no_grad():
-                values = model(children_tensor) - score_changes.unsqueeze(1)
+                values = model(children_tensor.to(device)) - score_changes.unsqueeze(
+                    1
+                ).to(device)
             piece_id = values.abs().argmin().item()
         self.play(piece_id, False)
 
@@ -154,7 +160,9 @@ class LITSGame:
                 moves, not flip
             )
             with torch.no_grad():
-                values = model(children_tensor) - score_changes.unsqueeze(1)
+                values = model(children_tensor.to(device)) - score_changes.unsqueeze(
+                    1
+                ).to(device)
             outputs.append(-values.min().item())
             if random.random() < epsilon:
                 piece_id = random.choice(moves)
