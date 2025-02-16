@@ -2,6 +2,7 @@ from unittest.mock import patch
 import pytest
 import torch
 from src.game import LITSGame
+from src.piece_utils import get_stacked_piece_tensor
 
 
 def test_game_play():
@@ -94,6 +95,9 @@ def test_generate_examples():
         ]
     )
     game.board._board_tensor = real_board
+    game.board._score_change = torch.tensordot(
+        game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
+    ).tolist()
 
     example_in, example_out = game.generate_examples(model, 0.0)
     assert example_in.shape == (3, 5, 4, 4)

@@ -27,7 +27,7 @@ class LITSGame:
         self.swapped = False
         self.completed = False
 
-    def play(self, piece_id: int) -> None:
+    def play(self, piece_id: int, check_validity: bool = True) -> None:
         """Make a move in the game.
 
         If it is the second player's first turn, they can choose to swap sides and
@@ -46,7 +46,7 @@ class LITSGame:
             self.swapped = True
             self.current_player = 0
             return
-        if not self.board.is_valid(piece_id):
+        if check_validity and not self.board.is_valid(piece_id):
             raise ValueError("Invalid move")
         self.board.play(piece_id)
         self.current_player = 1 - self.current_player
@@ -123,7 +123,10 @@ class LITSGame:
             model: The model to generate examples for.
             epsilon: The probability of choosing a random move instead of the best move.
         Returns:
-            A list of examples, each of the form (board_tensor, move_tensor, value).
+            - A tensor of inputs, where each input is a tensor representing the board
+                state.
+            - A tensor of expected ouputs for each input, based on the best value
+                predicted by the model after one move.
         """
         if self.board.played_ids:
             raise ValueError("Cannot generate examples for a game in progress")
@@ -138,11 +141,12 @@ class LITSGame:
             with torch.no_grad():
                 values = model(children_tensor) - score_changes.unsqueeze(1)
             piece_id = values.abs().argmin().item()
-        self.play(piece_id)
+        self.play(piece_id, False)
 
         inputs = []
         outputs = []
         while not self.completed:
+            # flip so that the current player is always trying to cover Xs
             flip = bool(len(self.board.played_ids) % 2)
             inputs.append(self.board.to_tensor(flip))
             moves = self.board.valid_moves()
@@ -156,7 +160,7 @@ class LITSGame:
                 piece_id = random.choice(moves)
             else:
                 piece_id = moves[values.argmin().item()]
-            self.play(piece_id)
+            self.play(piece_id, False)
 
         # add the final state
         flip = bool(len(self.board.played_ids) % 2)

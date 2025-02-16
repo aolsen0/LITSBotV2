@@ -84,6 +84,13 @@ def get_piece_type_of_id(piece_id: int, board_size: int = 10) -> PieceType:
     return PieceType.Invalid
 
 
+def get_total_number_of_pieces(board_size: int = 10) -> int:
+    """
+    Returns the total number of pieces on a board of the given size.
+    """
+    return 18 * board_size * board_size - 54 * board_size + 32
+
+
 @functools.cache
 def build_piece_list(board_size: int = 10) -> tuple[tuple[tuple[int, int], ...]]:
     """
@@ -173,3 +180,111 @@ def get_piece_tensor(piece_id: int, board_size: int = 10) -> torch.Tensor:
     for row, col in piece:
         tensor[piece_type.value, row, col] = 1.0
     return tensor
+
+
+@functools.cache
+def get_flat_piece_tensor(piece_id: int, board_size: int = 10) -> torch.Tensor:
+    """
+    Returns a tensor representing only the cells occupied by the given piece.
+    """
+    return get_piece_tensor(piece_id, board_size).sum(axis=0)
+
+
+@functools.cache
+def get_stacked_piece_tensor(board_size: int = 10) -> torch.Tensor:
+    """
+    Returns a tensor of all pieces locations for the given board size, of shape
+    (num_pieces, board_size, board_size).
+    """
+    return torch.stack(
+        [
+            get_flat_piece_tensor(i, board_size)
+            for i in range(get_total_number_of_pieces(board_size))
+        ]
+    )
+
+
+@functools.cache
+def get_piece_interactions(piece_id: int, board_size: int = 10) -> list[int]:
+    """Get all ways the given piece can interact with other pieces.
+
+    Interactions for each piece are represented as an integer from {-1, 0, 1}:
+     * -1 indicates that the piece is incompatible with the given piece, for example
+        due to them intersecting.
+     * 0 indicates that the piece does not interact with the given piece.
+     * 1 indicates that the piece is adjacent to the given piece in a way where both
+        pieces can be played.
+
+    Args:
+        piece_id: The id of the piece to get interactions for.
+        board_size: The size of the board.
+    Returns:
+        A list of interactions for the given piece with all other pieces, with length
+        equal to the number of pieces for the given board size.
+    """
+    piece_list = build_piece_list(board_size)
+    interactions = [0] * len(piece_list)
+    piece = set(piece_list[piece_id])
+    for i, other_piece in enumerate(piece_list):
+        if i == piece_id:
+            interactions[i] = -1
+        other_cells = set(other_piece)
+        # check if the pieces intersect
+        if piece & other_cells:
+            interactions[i] = -1
+            continue
+        # check if the pieces are adjacent, otherwise they don't interact
+        for cell in piece:
+            if any(taxi_distance(cell, other_cell) == 1 for other_cell in other_cells):
+                break
+        else:
+            continue
+        # check if the pieces are of the same type, which can't be adjacent
+        if get_piece_type_of_id(i, board_size) == get_piece_type_of_id(
+            piece_id, board_size
+        ):
+            interactions[i] = -1
+            continue
+        # check if the pieces form a 2x2 square when both are played
+        all_cells = piece | other_cells
+        for cell in all_cells:
+            row, col = cell
+            if (
+                (row + 1, col) in all_cells
+                and (row, col + 1) in all_cells
+                and (row + 1, col + 1) in all_cells
+            ):
+                interactions[i] = -1
+                break
+        else:  # otherwise the pieces are adjacent and can be played together
+            interactions[i] = 1
+    return interactions
+
+
+@functools.cache
+def get_adjacent_pieces(board_size: int = 10) -> list[set[int]]:
+    """
+    Returns a mapping from piece id to a list of piece ids which are adjacent to it.
+    """
+    result = []
+    for i in range(get_total_number_of_pieces(board_size)):
+        interactions = get_piece_interactions(i, board_size)
+        result.append(
+            {j for j, interaction in enumerate(interactions) if interaction == 1}
+        )
+    return result
+
+
+@functools.cache
+def get_conflicting_pieces(board_size: int = 10) -> list[set[int]]:
+    """
+    Returns a mapping from piece id to a list of piece ids which can never be played on
+    the board at the same time.
+    """
+    result = []
+    for i in range(get_total_number_of_pieces(board_size)):
+        interactions = get_piece_interactions(i, board_size)
+        result.append(
+            {j for j, interaction in enumerate(interactions) if interaction == -1}
+        )
+    return result

@@ -1,5 +1,6 @@
 import torch
 from src.board import LITSBoard
+from src.piece_utils import get_stacked_piece_tensor
 
 
 def test_board_construct():
@@ -88,6 +89,9 @@ def test_board_to_children_tensor():
     board._board_tensor[1, 0] = -1.0
     board._board_tensor[1, 2] = -1.0
     board._board_tensor[1, 3] = 1.0
+    board._score_change = torch.tensordot(
+        board._board_tensor, get_stacked_piece_tensor(15), dims=[[0, 1], [1, 2]]
+    ).tolist()
     tensor, changes = board.to_children_tensor([0, 1462, 1488], flip_xo=False)
     assert tensor.shape == (3, 5, 15, 15)
     assert tensor.sum([2, 3]).tolist() == [

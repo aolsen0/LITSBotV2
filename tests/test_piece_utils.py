@@ -1,6 +1,8 @@
 from src.piece_utils import (
     PieceType,
     build_piece_list,
+    get_adjacent_pieces,
+    get_conflicting_pieces,
     get_piece_tensor,
     get_piece_type,
     get_piece_type_of_id,
@@ -58,3 +60,26 @@ def test_get_piece_tensor():
     assert b[2, 1, 2] == 1.0
     assert b[2, 2, 2] == 1.0
     assert b[2, 3, 2] == 1.0
+
+
+def test_get_adjacent_pieces():
+    adjacent = get_adjacent_pieces(4)
+    assert len(adjacent) == 104
+    assert adjacent[0] == {52, 54, 72, 73, 74, 76, 96, 97, 98, 100}
+    assert len(adjacent[50]) == len(adjacent[51]) == 6
+
+
+def test_get_conflicting_pieces():
+    conflicting = get_conflicting_pieces(4)
+    assert len(conflicting) == 104
+    assert 25 in conflicting[0]  # intersecting L piece
+    assert 51 in conflicting[0]  # intersecting I piece
+    assert 19 in conflicting[0]  # adjacent L piece
+    assert 55 not in conflicting[0]  # non-adjacent I piece
+    assert 75 not in conflicting[0]  # non-adjacent T piece
+    assert 95 in conflicting[0]  # S piece that forms a 2x2 square
+    assert 43 not in conflicting[0]  # non-adjacent L piece
+
+    adjacent = get_adjacent_pieces(4)
+    for i in range(104):
+        assert not conflicting[i] & adjacent[i]

@@ -1,5 +1,4 @@
 import collections
-import itertools
 import random
 import colorama
 import numpy as np
@@ -8,8 +7,12 @@ import torch
 from src.piece_utils import (
     PieceType,
     build_piece_list,
+    get_adjacent_pieces,
+    get_conflicting_pieces,
     get_piece_tensor,
     get_piece_type_of_id,
+    get_stacked_piece_tensor,
+    get_total_number_of_pieces,
     taxi_distance,
 )
 
@@ -53,6 +56,12 @@ class LITSBoard:
             piece_type: torch.zeros(board_size, board_size)
             for piece_type in PieceType.all_values()
         }
+        self._to_tensor_memo = {}
+        self._valid_moves_memo = {}
+        self._score_change = torch.tensordot(
+            board_tensor, get_stacked_piece_tensor(board_size), dims=[[0, 1], [1, 2]]
+        ).tolist()
+        self.played_cells = set()
 
     def play(self, piece_id: int) -> None:
         """Play a piece on the current board.
@@ -62,16 +71,40 @@ class LITSBoard:
         self.played_ids.append(piece_id)
         piece_type = get_piece_type_of_id(piece_id, self.board_size)
         cells = build_piece_list(self.board_size)[piece_id]
+        self.played_cells |= set(cells)
         for row, col in cells:
             self._piece_tensors[piece_type][row, col] = 1.0
 
-    def to_tensor(self, flip_xo: bool = False) -> torch.Tensor:
+    def _to_tensor(self, flip_xo: bool = False) -> torch.Tensor:
         if flip_xo:
             return torch.stack([-self._board_tensor, *self._piece_tensors.values()])
         return torch.stack([self._board_tensor, *self._piece_tensors.values()])
 
-    def is_valid(self, new_piece_id: int) -> bool:
-        """Check if a piece can be legally played on the current board."""
+    def to_tensor(self, flip_xo: bool = False) -> torch.Tensor:
+        """Return a tensor representation of the board state.
+
+        Args:
+            flip_xo: If True, flip the Xs and Os on the board.
+        Returns:
+            Tensor of shape (5, board_size, board_size) representing the board state.
+            The first channel represents the Xs and Os on the board, and the remaining
+            channels represent the cells occupied by pieces of each type."""
+        key = (flip_xo, len(self.played_ids))
+        if key not in self._to_tensor_memo:
+            self._to_tensor_memo[key] = self._to_tensor(flip_xo)
+        return self._to_tensor_memo[key]
+
+    def is_valid(self, new_piece_id: int, fast_check: bool = False) -> bool:
+        """Check if a piece can be legally played on the current board.
+
+        Args:
+            new_piece_id: ID of the piece to check.
+            fast_check: If True, skip some checks that can be done more efficiently
+                later. Should only be used when we know the new piece is adjacent to an
+                existing piece and does not conflict with any existing pieces.
+        Returns:
+            True if the piece can be played, False otherwise.
+        """
         new_piece_type = get_piece_type_of_id(new_piece_id, self.board_size)
         if new_piece_type == PieceType.Invalid:
             raise ValueError("no piece exists with that id")
@@ -89,36 +122,35 @@ class LITSBoard:
 
         piece_list = build_piece_list(self.board_size)
         new_cells = piece_list[new_piece_id]
-        # Check that the piece does not intersect already played pieces
-        played_cells = set(
-            itertools.chain(*[piece_list[played_id] for played_id in self.played_ids])
-        )
-        if played_cells & set(new_cells):
-            return False
 
-        # Check that the piece is adjacent to a previously played piece
-        for cell in played_cells:
-            for new_cell in new_cells:
-                if taxi_distance(cell, new_cell) == 1:
-                    break
-            else:
-                continue
-            break
-        else:
-            return False
+        if not fast_check:
+            # Check that the piece does not intersect already played pieces
+            if self.played_cells & set(new_cells):
+                return False
 
-        # Check that the piece is not adjacent to another piece of the same type
-        for played_id in self.played_ids:
-            if get_piece_type_of_id(played_id, self.board_size) == new_piece_type:
+            # Check that the piece is adjacent to a previously played piece
+            for cell in self.played_cells:
                 for new_cell in new_cells:
-                    for cell in piece_list[played_id]:
-                        distance = taxi_distance(cell, new_cell)
-                        assert distance != 0
-                        if distance == 1:
-                            return False
+                    if taxi_distance(cell, new_cell) == 1:
+                        break
+                else:
+                    continue
+                break
+            else:
+                return False
+
+            # Check that the piece is not adjacent to another piece of the same type
+            for played_id in self.played_ids:
+                if get_piece_type_of_id(played_id, self.board_size) == new_piece_type:
+                    for new_cell in new_cells:
+                        for cell in piece_list[played_id]:
+                            distance = taxi_distance(cell, new_cell)
+                            assert distance != 0
+                            if distance == 1:
+                                return False
 
         # Check that the piece does not fill a 2x2 square anywhere on the board
-        total_cells = set(new_cells) | played_cells
+        total_cells = set(new_cells) | self.played_cells
         for cell in new_cells:
             row, col = cell
             # check each of the four possible 2x2 squares containing the cell
@@ -134,10 +166,32 @@ class LITSBoard:
 
     def valid_moves(self) -> list[int]:
         """Return a list of all piece ids which can currently be played."""
+        if len(self.played_ids) == 0:
+            return list(range(get_total_number_of_pieces(self.board_size)))
+        if len(self.played_ids) in self._valid_moves_memo:
+            return self._valid_moves_memo[len(self.played_ids)]
+        if len(self.played_ids) == 1:
+            result = sorted(get_adjacent_pieces(self.board_size)[self.played_ids[0]])
+            self._valid_moves_memo[1] = result
+            return result
+        if len(self.played_ids) - 1 in self._valid_moves_memo:
+            # If we have already computed the valid moves for the previous state, we can
+            # quickly compute the valid moves for the current state by considering only
+            # the pieces adjacent to the last played piece and the pieces that were
+            # valid in the previous state.
+            candidates = set(self._valid_moves_memo[len(self.played_ids) - 1])
+            candidates |= get_adjacent_pieces(self.board_size)[self.played_ids[-1]]
+            fast_check = True
+        else:
+            candidates = set(range(get_total_number_of_pieces(self.board_size)))
+            fast_check = False
+        for played_id in self.played_ids:
+            candidates -= get_conflicting_pieces(self.board_size)[played_id]
         legal = []
-        for i in range(len(build_piece_list(self.board_size))):
-            if self.is_valid(i):
+        for i in candidates:
+            if self.is_valid(i, fast_check):
                 legal.append(i)
+        self._valid_moves_memo[len(self.played_ids)] = legal
         return legal
 
     def __str__(self) -> str:
@@ -178,7 +232,9 @@ class LITSBoard:
         current_tensor = self.to_tensor(flip_xo)
         piece_tensor = get_piece_tensor(piece_id, self.board_size)
         result = current_tensor + piece_tensor
-        score_change = (current_tensor[0] * piece_tensor.sum(axis=0)).sum()
+        score_change = self._score_change[piece_id]
+        if flip_xo:
+            score_change *= -1
         return result, score_change
 
     def to_children_tensor(
