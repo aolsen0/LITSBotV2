@@ -1,4 +1,3 @@
-import time
 import torch
 import torch.nn as nn
 from src.game import LITSGame
@@ -19,7 +18,7 @@ def train_model(model: LITSModel, games: int, epsilon: float, lr: float) -> None
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
-    recent_losses = [0.0] * 100
+    recent_losses = [0.0] * 1000
     for _ in range(games):
         game = LITSGame(
             board_size=model.board_size,
@@ -31,9 +30,8 @@ def train_model(model: LITSModel, games: int, epsilon: float, lr: float) -> None
         optimizer.zero_grad()
         output = model(inputs.to(device))
         loss = loss_fn(output, value.to(device))
-        recent_losses[_ % 100] = loss.item()
-        if _ % 100 == 99:
-            print(time.time())
-            print(f"{_ + 1} games played. Loss: {sum(recent_losses) / 100}")
+        recent_losses[_ % 1000] = loss.item()
+        if _ % 1000 == 999:
+            print(f"{_ + 1} games played. Loss: {sum(recent_losses) / 1000}")
         loss.backward()
         optimizer.step()
