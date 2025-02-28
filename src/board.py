@@ -9,9 +9,10 @@ from src.piece_utils import (
     build_piece_list,
     get_adjacent_pieces,
     get_conflicting_pieces,
-    get_piece_tensor,
+    get_flat_piece_tensor,
     get_piece_type_of_id,
     get_stacked_piece_tensor,
+    get_stacked_wide_piece_tensor,
     get_total_number_of_pieces,
     taxi_distance,
 )
@@ -60,7 +61,7 @@ class LITSBoard:
         self._valid_moves_memo = {}
         self._score_change = torch.tensordot(
             board_tensor, get_stacked_piece_tensor(board_size), dims=[[0, 1], [1, 2]]
-        ).tolist()
+        )
         self.played_cells = set()
 
     def play(self, piece_id: int) -> None:
@@ -72,8 +73,9 @@ class LITSBoard:
         piece_type = get_piece_type_of_id(piece_id, self.board_size)
         cells = build_piece_list(self.board_size)[piece_id]
         self.played_cells |= set(cells)
-        for row, col in cells:
-            self._piece_tensors[piece_type][row, col] = 1.0
+        self._piece_tensors[piece_type] += get_flat_piece_tensor(
+            piece_id, self.board_size
+        )
 
     def _to_tensor(self, flip_xo: bool = False) -> torch.Tensor:
         if flip_xo:
@@ -224,19 +226,6 @@ class LITSBoard:
         footer = header[1:]
         return ("\n").join(header + rows + footer)
 
-    def _tensor_after_playing_piece(
-        self, piece_id: int, flip_xo: bool = True
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return the hypothetical board tensor after playing the given piece, as well
-        as the change in score that would result from playing the piece."""
-        current_tensor = self.to_tensor(flip_xo)
-        piece_tensor = get_piece_tensor(piece_id, self.board_size)
-        result = current_tensor + piece_tensor
-        score_change = self._score_change[piece_id]
-        if flip_xo:
-            score_change *= -1
-        return result, score_change
-
     def to_children_tensor(
         self, pieces_to_use: list[int], flip_xo: bool = True
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -252,12 +241,9 @@ class LITSBoard:
             - Tensor of shape (len(pieces_to_use),) representing the change in score
                 that would result from each piece being played.
         """
-        children = []
-        score_changes = []
-        for piece_id in pieces_to_use:
-            child_tensor, score_change = self._tensor_after_playing_piece(
-                piece_id, flip_xo
-            )
-            children.append(child_tensor)
-            score_changes.append(score_change)
-        return torch.stack(children), torch.tensor(score_changes)
+        current_tensor = self.to_tensor(flip_xo)
+        piece_tensors = get_stacked_wide_piece_tensor(self.board_size)[pieces_to_use]
+        score_changes = self._score_change[pieces_to_use]
+        if flip_xo:
+            score_changes = -score_changes
+        return current_tensor + piece_tensors, score_changes

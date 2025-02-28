@@ -173,8 +173,7 @@ class LITSGame:
         # add the final state
         flip = bool(len(self.board.played_ids) % 2)
         inputs.append(self.board.to_tensor(flip))
-        value = -self.score() if flip else self.score()
-        outputs.append(1.0 if value > 0 else -1.0)
+        outputs.append(0.0)
 
         return torch.stack(inputs), torch.tensor(outputs).unsqueeze(1)
 

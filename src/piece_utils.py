@@ -205,6 +205,20 @@ def get_stacked_piece_tensor(board_size: int = 10) -> torch.Tensor:
 
 
 @functools.cache
+def get_stacked_wide_piece_tensor(board_size: int = 10) -> torch.Tensor:
+    """
+    Returns a tensor of all pieces locations for the given board size, of shape
+    (num_pieces, 5, board_size, board_size).
+    """
+    return torch.stack(
+        [
+            get_piece_tensor(i, board_size)
+            for i in range(get_total_number_of_pieces(board_size))
+        ]
+    )
+
+
+@functools.cache
 def get_piece_interactions(piece_id: int, board_size: int = 10) -> list[int]:
     """Get all ways the given piece can interact with other pieces.
 

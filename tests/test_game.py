@@ -98,12 +98,12 @@ def test_generate_examples():
     game.board._board_tensor = real_board
     game.board._score_change = torch.tensordot(
         game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
-    ).tolist()
+    )
 
     example_in, example_out = game.generate_examples(model, 0.0)
     assert example_in.shape == (3, 5, 4, 4)
     assert example_out.shape == (3, 1)
-    assert example_out.tolist() == [[45], [0], [-1]]
+    assert example_out.tolist() == [[45], [0], [0]]
     assert example_in[0, 0].equal(-real_board)
     assert example_in[1, 0].equal(real_board)
     assert example_in[2, 0].equal(-real_board)
@@ -148,7 +148,7 @@ def test_play_best():
     game.board._board_tensor = real_board
     game.board._score_change = torch.tensordot(
         game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
-    ).tolist()
+    )
 
     game.play_best(model)
     assert game.board.played_ids == [0]
