@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from src.board import LITSBoard
-from src.piece_utils import map_cells_to_id
+from src.piece_utils import get_total_number_of_pieces, map_cells_to_id
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -117,7 +117,7 @@ class LITSGame:
             )
 
     def generate_examples(
-        self, model: nn.Module, epsilon: float = 0.2
+        self, model: nn.Module, epsilon: float = 0.2, single_output: bool = True
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate examples for training a reinforcement learning model.
 
@@ -126,10 +126,16 @@ class LITSGame:
         Args:
             model: The model to generate examples for.
             epsilon: The probability of choosing a random move instead of the best move.
+            single_output: Whether the model estimates the value of the current game
+                state, or the value of each possible move in the current game state.
+                Models estimating the value of each possible move should output a tensor
+                of shape (batch_size, 2, num_moves), where the first channel contains
+                the value of the game state after each move, and the second channel
+                contains the estimated legality of each move.
         Returns:
             - A tensor of inputs, where each input is a tensor representing the board
                 state.
-            - A tensor of expected ouputs for each input, based on the best value
+            - A tensor of expected ouputs for each input, based on the best value(s)
                 predicted by the model after one move.
         """
         if self.board.played_ids:
@@ -142,11 +148,20 @@ class LITSGame:
             children_tensor, score_changes = self.board.to_children_tensor(
                 self.board.valid_moves()
             )
-            with torch.no_grad():
-                values = model(children_tensor.to(device)) - score_changes.unsqueeze(
-                    1
-                ).to(device)
-            piece_id = values.abs().argmin().item()
+            if single_output:
+                with torch.no_grad():
+                    values = model(
+                        children_tensor.to(device)
+                    ) - score_changes.unsqueeze(1).to(device)
+                piece_id = values.abs().argmin().item()
+            else:
+                output = model(children_tensor.to(device))
+                score = (
+                    torch.where(output[:, 1] > 0.5, output[:, 0], -float("inf"))
+                    .max(dim=1)
+                    .values
+                )
+                piece_id = (score - score_changes.to(device)).abs().argmin().item()
         self.play(piece_id, False)
 
         inputs = []
@@ -159,25 +174,58 @@ class LITSGame:
             children_tensor, score_changes = self.board.to_children_tensor(
                 moves, not flip
             )
-            with torch.no_grad():
-                values = model(children_tensor.to(device)) - score_changes.unsqueeze(
-                    1
-                ).to(device)
-            outputs.append(-values.min().item())
+
+            if single_output:
+                with torch.no_grad():
+                    values = model(
+                        children_tensor.to(device)
+                    ) - score_changes.unsqueeze(1).to(device)
+                outputs.append(-values.min(dim=0).values)
+            else:
+                with torch.no_grad():
+                    values = model(children_tensor.to(device))
+                score = (
+                    torch.where(values[:, 1] > 0.5, values[:, 0], -float("inf"))
+                    .max(dim=1)
+                    .values
+                )
+                print(moves)
+                print(score)
+                # if there are no legal moves, than no more moves can be played and
+                # the remaining score must be 0.
+                score[score == -float("inf")] = 0.0
+                correct = score_changes.to(device) - score
+
+                output = torch.zeros(
+                    [2, get_total_number_of_pieces(self.board_size)], device=device
+                )
+                output[0, moves] = correct
+                output[1, moves] = 1.0
+                outputs.append(output)
             if random.random() < epsilon:
                 piece_id = random.choice(moves)
             else:
-                piece_id = moves[values.argmin().item()]
+                if single_output:
+                    piece_id = moves[values.argmin().item()]
+                else:
+                    piece_id = moves[correct.argmax().item()]
             self.play(piece_id, False)
 
         # add the final state
         flip = bool(len(self.board.played_ids) % 2)
         inputs.append(self.board.to_tensor(flip))
-        outputs.append(0.0)
+        if single_output:
+            outputs.append(torch.zeros([1], device=device))
+        else:
+            outputs.append(
+                torch.zeros(
+                    [2, get_total_number_of_pieces(self.board_size)], device=device
+                )
+            )
 
-        return torch.stack(inputs), torch.tensor(outputs).unsqueeze(1)
+        return torch.stack(inputs), torch.stack(outputs)
 
-    def play_best(self, model: nn.Module) -> None:
+    def play_best(self, model: nn.Module, single_output: bool = True) -> None:
         """Play the best move according to the given model.
 
         Assumes the model estimates future score changes, as suggested by the examples
@@ -188,10 +236,20 @@ class LITSGame:
         moves = self.board.valid_moves()
         flip = self.current_player ^ self.swapped
         children_tensor, score_changes = self.board.to_children_tensor(moves, not flip)
-        with torch.no_grad():
-            values = model(children_tensor.to(device)) - score_changes.unsqueeze(1).to(
-                device
+        if single_output:
+            with torch.no_grad():
+                values = model(children_tensor.to(device)) - score_changes.unsqueeze(
+                    1
+                ).to(device)
+        else:
+            with torch.no_grad():
+                output = model(children_tensor.to(device))
+            score = (
+                torch.where(output[:, 1] > 0.5, output[:, 0], -float("inf"))
+                .max(axis=1)
+                .values
             )
+            values = score - score_changes.to(device)
         if len(self.board.played_ids) == 0:
             # make an equal move as the opponent can choose to swap sides
             piece_id = moves[values.abs().argmin().item()]
@@ -202,7 +260,7 @@ class LITSGame:
             piece_id = moves[values.argmin().item()]
         self.play(piece_id)
 
-    def evaluate(self, model: nn.Module) -> float:
+    def evaluate(self, model: nn.Module, single_output: bool = True) -> float:
         """Evaluate the game state using the given model.
 
         Should not be expected to make sense before the second player has chosen whether
@@ -215,16 +273,26 @@ class LITSGame:
         """
         flip = self.current_player ^ self.swapped
         with torch.no_grad():
-            value = model(self.board.to_tensor(flip).unsqueeze(0).to(device)).item()
+            if single_output:
+                value = model(self.board.to_tensor(flip).unsqueeze(0).to(device)).item()
+            else:
+                output = model(self.board.to_tensor(flip).unsqueeze(0).to(device))
+                value = (
+                    torch.where(output[:, 1] > 0.5, output[:, 0], -float("inf"))
+                    .max()
+                    .item()
+                )
         if self.current_player:
             value = -value
         return self.score() + value
 
-    def play_against(self, model: nn.Module, model_player: int = 1) -> None:
+    def play_against(
+        self, model: nn.Module, model_player: int = 1, single_output: bool = True
+    ) -> None:
         """Play a game against the given model."""
         while not self.completed:
             if self.current_player == model_player - 1:
-                self.play_best(model)
+                self.play_best(model, single_output)
             else:
                 self.prompt()
         print(self.board)

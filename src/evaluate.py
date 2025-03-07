@@ -1,12 +1,14 @@
 import torch
 from src.game import LITSGame
-from src.model import LITSModel
+from src.model import LITSModel, MoveModel
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def compare_models(model1: LITSModel, model2: LITSModel, num_games: int = 1) -> int:
+def compare_models(
+    model1: LITSModel | MoveModel, model2: LITSModel | MoveModel, num_games: int = 1
+) -> int:
     """Compare two models by playing several games against each other.
 
     Args:
@@ -34,9 +36,19 @@ def compare_models(model1: LITSModel, model2: LITSModel, num_games: int = 1) -> 
             first, second = model2, model1
         while not game.completed:
             if game.current_player == 0:
-                game.play_best(first)
+                if isinstance(first, LITSModel):
+                    game.play_best(first)
+                elif isinstance(first, MoveModel):
+                    game.play_best(first, False)
+                else:
+                    raise ValueError("Invalid model type")
             else:
-                game.play_best(second)
+                if isinstance(second, LITSModel):
+                    game.play_best(second)
+                elif isinstance(second, MoveModel):
+                    game.play_best(second, False)
+                else:
+                    raise ValueError("Invalid model type")
         if game.score() > 0 and i % 2 == 0 or game.score() < 0 and i % 2 == 1:
             wins += 1
     return wins

@@ -129,6 +129,33 @@ def test_generate_examples():
     assert example_in[0, 0].equal(-real_board)
     assert example_in[1, 0].equal(real_board)
 
+    # Test with single_output=False
+    def model(tensor):
+        return 5 * torch.tensor([list(range(tensor.shape[0] * 208))]).reshape(
+            [tensor.shape[0], 2, 104]
+        ).to(device)
+
+    game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+
+    real_board = torch.tensor(
+        [
+            [0.0, -1.0, 0.0, -1.0],
+            [-1.0, 0.0, 1.0, 0.0],
+            [0.0, -1.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0, 0.0],
+        ]
+    )
+    game.board._board_tensor = real_board
+    game.board._score_change = torch.tensordot(
+        game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
+    )
+    example_in, example_out = game.generate_examples(model, 0.0, False)
+    assert example_in.shape == (3, 5, 4, 4)
+    assert example_out.shape == (3, 2, 104)
+    assert example_out[0][1].sum() == 10
+    assert example_out[0][0][52] == -515
+    assert example_out[2].equal(torch.zeros(2, 104).to(device))
+
 
 def test_play_best():
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
@@ -157,6 +184,20 @@ def test_play_best():
     game.play_best(model)
     assert game.board.played_ids == [0, 100]
 
+    # Test with single_output=False
+    def model(tensor):
+        return 5 * torch.tensor([list(range(tensor.shape[0] * 208))]).reshape(
+            [tensor.shape[0], 2, 104]
+        ).to(device)
+
+    game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+    game.board._board_tensor = real_board
+    game.board._score_change = torch.tensordot(
+        game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
+    )
+    game.play_best(model, False)
+    assert game.board.played_ids == [0]
+
 
 def test_game_evaluate():
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
@@ -183,3 +224,17 @@ def test_game_evaluate():
     assert game.evaluate(model) == -7.0
     game.play(98)
     assert game.evaluate(model) == 5.5
+
+    game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
+    legality = torch.tensor([1, 0] * 52)
+    score = torch.randn(104)
+
+    def model(tensor):
+        return torch.stack([score, legality], dim=0).unsqueeze(0)
+
+    game.board._board_tensor = real_board
+    game.board._score_change = torch.tensordot(
+        game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
+    ).tolist()
+    game.play(0)
+    assert game.evaluate(model, False) == 2 - score[::2].max().item()
