@@ -52,3 +52,41 @@ def compare_models(
         if game.score() > 0 and i % 2 == 0 or game.score() < 0 and i % 2 == 1:
             wins += 1
     return wins
+
+
+def legality_accuracy(
+    model: MoveModel, games: int = 1000, epsilon: float = 0.0
+) -> None:
+    """Calculate the accuracy of a model's legality predictions.
+
+    Args:
+        model: The model to evaluate.
+        games: The number of games to play to evaluate the model.
+    """
+    model = model.to(device)
+    true_positives = 0
+    true_negatives = 0
+    false_negatives = 0
+    false_positives = 0
+    total_loss = 0.0
+    for _ in range(games):
+        game = LITSGame(
+            board_size=model.board_size,
+            num_xs=model.num_xs,
+            max_pieces_per_shape=model.max_pieces_per_shape,
+        )
+        inputs, outputs = game.generate_examples(model, epsilon, single_output=False)
+        result = model(inputs.to(device))[:, 1]
+        legal = outputs[:, 1]
+        true_positives += torch.sum((result > 0.5) & (legal > 0.5)).item()
+        true_negatives += torch.sum((result <= 0.5) & (legal <= 0.5)).item()
+        false_negatives += torch.sum((result <= 0.5) & (legal > 0.5)).item()
+        false_positives += torch.sum((result > 0.5) & (legal <= 0.5)).item()
+        total_loss += torch.mean((result - legal) ** 2).item()
+    total = true_positives + true_negatives + false_negatives + false_positives
+    print(f"Accuracy: {(true_positives + true_negatives) / total}")
+    print(f"Precision: {true_positives / (true_positives + false_positives)}")
+    print(f"Recall: {true_positives / (true_positives + false_negatives)}")
+    print(f"MSE Loss: {total_loss / games}")
+    print(f"True positives: {true_positives}, False positives: {false_positives}")
+    print(f"True negatives: {true_negatives}, False negatives: {false_negatives}")

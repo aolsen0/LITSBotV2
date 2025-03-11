@@ -189,8 +189,6 @@ class LITSGame:
                     .max(dim=1)
                     .values
                 )
-                print(moves)
-                print(score)
                 # if there are no legal moves, than no more moves can be played and
                 # the remaining score must be 0.
                 score[score == -float("inf")] = 0.0
