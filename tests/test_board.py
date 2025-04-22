@@ -1,3 +1,4 @@
+import random
 import torch
 from src.board import LITSBoard
 from src.piece_utils import get_stacked_piece_tensor
@@ -70,6 +71,22 @@ def test_board_valid_moves():
     assert len(board.valid_moves()) == 36
 
 
+def test_board_valid_static():
+    board = LITSBoard()
+    legal_moves = board.valid_moves()
+    while legal_moves:
+        board.play(random.choice(legal_moves))
+        new_legal = LITSBoard.subsequent_valid_static(
+            board.board_size,
+            board.max_pieces_per_shape,
+            legal_moves,
+            board.played_ids,
+            board.played_cells,
+        )
+        assert sorted(new_legal) == sorted(board.valid_moves())
+        legal_moves = new_legal
+
+
 def test_board_str():
     board = LITSBoard(board_size=15)
     board_str = str(board)
@@ -110,3 +127,18 @@ def test_board_to_children_tensor():
     ]
     assert changes.tolist() == [1.0, 0.0]
     assert tensor[0, 0].equal(-new_tensor[0, 0])
+
+
+def test_to_children_tensor_static():
+    board = LITSBoard(board_size=7, num_xs=10)
+    legal_moves = board.valid_moves()
+    while legal_moves:
+        current_tensor = board.to_tensor()
+        to_use = legal_moves[::2]
+        instance = board.to_children_tensor(to_use)[0]
+        static = LITSBoard.to_children_tensor_static(
+            board.board_size, current_tensor, to_use
+        )
+        assert torch.equal(instance, static)
+        board.play(random.choice(legal_moves))
+        legal_moves = board.valid_moves()

@@ -3,7 +3,9 @@ import torch
 import torch.nn as nn
 
 from src.board import LITSBoard
+from src.model import LITSModel, MoveModel
 from src.piece_utils import get_total_number_of_pieces, map_cells_to_id
+from src.search import SearchNode
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -167,7 +169,7 @@ class LITSGame:
         inputs = []
         outputs = []
         while not self.completed:
-            # flip so that the current player is always trying to cover Xs
+            # flip so that the current player is always trying to cover Os
             flip = bool(len(self.board.played_ids) % 2)
             inputs.append(self.board.to_tensor(flip))
             moves = self.board.valid_moves()
@@ -297,3 +299,23 @@ class LITSGame:
         winner = 1 if self.score() > 0 else 2
         print(f"Player {winner} wins")
         print(f"Score: {self.score()}")
+
+    def get_search_root_node(
+        self,
+        model: LITSModel | MoveModel,
+        skip_legality_check: bool = False,
+    ) -> SearchNode:
+        return SearchNode(
+            self.board_size,
+            self.board.max_pieces_per_shape,
+            self.board._score_change,
+            None,
+            model,
+            isinstance(model, LITSModel),
+            self.board.played_ids,
+            self.board.played_cells,
+            self.board.to_tensor(bool(len(self.board.played_ids) % 2)),
+            None,
+            skip_legality_check=skip_legality_check,
+            legal_moves=self.board.valid_moves(),
+        )

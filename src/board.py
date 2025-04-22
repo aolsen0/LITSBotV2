@@ -196,6 +196,67 @@ class LITSBoard:
         self._valid_moves_memo[len(self.played_ids)] = legal
         return legal
 
+    @staticmethod
+    def subsequent_valid_static(
+        board_size: int,
+        max_pieces_per_shape: int,
+        previous_legal: list[int],
+        played_ids: list[int],
+        played_cells: set[tuple[int, int]],
+    ) -> list[int]:
+        """Given the list of legal moves for the previous state, return the list of
+        legal moves for the current state.
+
+        This is largely a static version of `valid_moves`, as the previously played
+        pieces are sufficient to determine the legal moves for the current state.
+
+        Args:
+            board_size: Number of rows and columns in the board.
+            max_pieces_per_shape: Maximum number of pieces of each shape that can be
+                placed on the board.
+            previous_legal: List of legal moves for the previous state.
+            played_ids: List of piece ids that have been played.
+            played_cells: Set of cells that have been played on.
+        Returns:
+            List of legal moves for the current state.
+        """
+        if len(played_ids) == 0:
+            return list(range(get_total_number_of_pieces(board_size)))
+        if len(played_ids) == 1:
+            candidates = set()
+        else:
+            candidates = set(previous_legal)
+        candidates |= get_adjacent_pieces(board_size)[played_ids[-1]]
+        for played_id in played_ids:
+            candidates -= get_conflicting_pieces(board_size)[played_id]
+        type_counts = collections.Counter(
+            get_piece_type_of_id(piece_id, board_size) for piece_id in played_ids
+        )
+
+        def check_legal(piece_id: int) -> bool:
+            new_piece_type = get_piece_type_of_id(piece_id, board_size)
+            if type_counts[new_piece_type] >= max_pieces_per_shape:
+                return False
+            new_cells = build_piece_list(board_size)[piece_id]
+            total_cells = set(new_cells) | played_cells
+            for cell in new_cells:
+                row, col = cell
+                for row_change in (-1, 1):
+                    for col_change in (-1, 1):
+                        if (
+                            (row + row_change, col) in total_cells
+                            and (row, col + col_change) in total_cells
+                            and (row + row_change, col + col_change) in total_cells
+                        ):
+                            return False
+            return True
+
+        legal = []
+        for i in candidates:
+            if check_legal(i):
+                legal.append(i)
+        return legal
+
     def __str__(self) -> str:
         board_str = np.full(
             [self.board_size, self.board_size], " ", dtype=np.dtypes.StringDType
@@ -247,3 +308,24 @@ class LITSBoard:
         if flip_xo:
             score_changes = -score_changes
         return current_tensor + piece_tensors, score_changes
+
+    @staticmethod
+    def to_children_tensor_static(
+        board_size: int,
+        current_tensor: torch.Tensor,
+        pieces_to_use: list[int],
+    ) -> torch.Tensor:
+        """Return the tensor representing all possible board states after the given
+        pieces are played.
+
+        Args:
+            board_size: Number of rows and columns in the board.
+            current_tensor: Tensor representing the current board state.
+            pieces_to_use: List of piece ids to consider playing.
+        Returns:
+            Tensor of shape (len(pieces_to_use), 5, board_size, board_size)
+            representing the board states after each piece is played.
+        """
+        flipped_tensor = torch.stack([-current_tensor[0], *current_tensor[1:]])
+        piece_tensors = get_stacked_wide_piece_tensor(board_size)[pieces_to_use]
+        return flipped_tensor + piece_tensors
