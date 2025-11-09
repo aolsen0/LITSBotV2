@@ -5,6 +5,8 @@ from src.model import LITSModel, MoveModel
 from src.piece_utils import build_piece_list
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEPTH_0_CLIP = 1.0
+DEPTH_1_CLIP = 0.75
 
 
 class SearchNode:
@@ -29,7 +31,7 @@ class SearchNode:
         self.max_pieces_per_shape = max_pieces_per_shape
         self.score_changes = score_changes
         self.parent = parent
-        self.children = []
+        self.children: list["SearchNode" | None] = []
         self.model = model
         self.single_output = single_output
         self.played_pieces = played_pieces
@@ -64,12 +66,11 @@ class SearchNode:
         if len(played_pieces) % 2:
             self.important_score_changes = -self.important_score_changes
         with torch.no_grad():
-            self.children_output = model(self.children_tensor.to(device))
+            self.children_output = model(self.children_tensor.to(device)).to("cpu")
         if single_output:
-            value = self.children_output.reshape(-1) + self.important_score_changes.to(
-                device
-            )
+            value = self.children_output.reshape(-1) + self.important_score_changes
             self.value = -value.min().item()
+            self.best_move_index = value.argmin().item()
         else:
             score = (
                 torch.where(
@@ -81,20 +82,33 @@ class SearchNode:
                 .values
             )
             score[score == -float("inf")] = 0.0
-            value = score + self.important_score_changes.to(device)
-            print(value)
+            value = score + self.important_score_changes
             self.value = -value.min().item()
+            self.best_move_index = value.argmin().item()
 
     def add_children(self):
         """Add children to the current node."""
         for i in range(self.children_tensor.shape[0]):
+            curr_output = self.children_output[i]
+            curr_value = (
+                curr_output.item()
+                if self.single_output
+                else torch.where(curr_output[1] > 0.5, curr_output[0], -float("inf"))
+                .max()
+                .item()
+            )
+            if curr_value == -float("inf"):
+                curr_value = 0.0
+            curr_value += self.important_score_changes[i].item()
+            if -curr_value < self.value - DEPTH_0_CLIP:
+                self.children.append(None)
+                continue
             piece_id = self.legal_moves[i]
             played_pieces = self.played_pieces + [piece_id]
             played_cells = self.played_cells | set(
                 build_piece_list(self.board_size)[piece_id]
             )
             curr_tensor = self.children_tensor[i]
-            curr_output = self.children_output[i]
             child_node = SearchNode(
                 self.board_size,
                 self.max_pieces_per_shape,
@@ -109,3 +123,79 @@ class SearchNode:
                 self.skip_legality_check,
             )
             self.children.append(child_node)
+
+    def alpha_beta_search(
+        self,
+        depth: int,
+        alpha: float = -float("inf"),
+        beta: float = float("inf"),
+        alpha_player: bool = True,
+    ):
+        """
+        Perform alpha-beta pruning search to the specified depth.
+
+        Args:
+            depth: Maximum depth to search
+            alpha: Alpha value for pruning
+            beta: Beta value for pruning
+            maximizing_player: Whether current player is maximizing
+
+        Returns:
+            Tuple of (best_value, best_move_index) where best_move_index is the index
+            in self.legal_moves corresponding to the best move
+        """
+        if depth == 0 or not self.legal_moves:
+            return self.value
+
+        # Create children if they don't exist yet
+        if not self.children:
+            self.add_children()
+
+        # Get children with their evaluation scores for sorting
+        child_values = [
+            (i, child.value + self.important_score_changes[i].item())
+            for i, child in enumerate(self.children)
+            if child is not None
+        ]
+        child_values.sort(key=lambda x: x[1])
+        best_prior_value = child_values[0][1]
+        for i, value in child_values:
+            # these cases are probably never optimal moves, it's fine to delete them
+            if value > best_prior_value + DEPTH_1_CLIP:
+                self.children[i] = None
+
+        best_value = -float("inf")
+        best_move_index = None
+
+        for i, value in child_values:
+            child = self.children[i]
+            if child is None:
+                continue
+
+            # Recursively search child node
+            next_score = self.important_score_changes[i].item()
+            child_value = (
+                child.alpha_beta_search(
+                    depth - 1, alpha + next_score, beta + next_score, not alpha_player
+                )
+                + next_score
+            )
+
+            if -child_value > best_value:
+                best_value = -child_value
+                best_move_index = i
+
+            if alpha_player:
+                alpha = max(alpha, best_value)
+            else:
+                beta = min(beta, -best_value)
+
+            # Prune if possible
+            if beta <= alpha:
+                print("broke")
+                break
+
+        self.value = best_value
+        self.best_move_index = best_move_index
+
+        return best_value
