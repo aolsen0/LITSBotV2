@@ -287,6 +287,17 @@ class LITSBoard:
         footer = header[1:]
         return ("\n").join(header + rows + footer)
 
+    def slim_str(self) -> str:
+        """Return a string representation of the board containing only the Xs and Os."""
+        board_str = np.full(
+            [self.board_size, self.board_size], " ", dtype=np.dtypes.StringDType
+        )
+        board_str[self._board_tensor > 0] = "X"
+        board_str[self._board_tensor < 0] = "O"
+
+        rows = ["".join(row) for row in board_str]
+        return ("\n").join(rows)
+
     def to_children_tensor(
         self, pieces_to_use: list[int], flip_xo: bool = True
     ) -> tuple[torch.Tensor, torch.Tensor]:

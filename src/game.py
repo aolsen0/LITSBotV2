@@ -1,4 +1,5 @@
 import random
+import time
 import torch
 import torch.nn as nn
 
@@ -30,6 +31,25 @@ class LITSGame:
         self.current_player = 0
         self.swapped = False
         self.completed = False
+
+    def __str__(self) -> str:
+        tensor = self.board.to_tensor()
+        covered = tensor[1:].sum(axis=0)
+        symbols = tensor[0].clone()
+        symbols[covered > 0] = 0.0
+        num_x = (symbols == 1.0).sum().item()
+        num_o = (symbols == -1.0).sum().item()
+        x_player, y_player = 1, 2
+        if self.swapped:
+            x_player, y_player = 2, 1
+        lines = []
+        lines.append(f"Player {x_player} (X) score: {num_x}")
+        lines.append(f"Player {y_player} (O) score: {num_o}")
+        if self.swapped:
+            lines = lines[::-1]
+        lines.append(f"Current turn: Player {self.current_player + 1}")
+        lines.append(str(self.board))
+        return "\n".join(lines)
 
     def play(self, piece_id: int, check_validity: bool = True) -> None:
         """Make a move in the game.
@@ -86,7 +106,7 @@ class LITSGame:
         if self.completed:
             print("Game over")
             return
-        print(self.board)
+        print(self)
         print(f"Player {self.current_player + 1} to play")
         if self.is_swappable():
             print("Do you want to swap sides? (y/n)")
@@ -299,6 +319,22 @@ class LITSGame:
         winner = 1 if self.score() > 0 else 2
         print(f"Player {winner} wins")
         print(f"Score: {self.score()}")
+
+    def play_think(self, model: LITSModel | MoveModel, time_limit: float = 5.0) -> None:
+        """Use alpha-beta search to play the best move according to the given model."""
+        start_time = time.time()
+        kill_time = start_time + time_limit
+        node = self.get_search_root_node(model)
+        depth = 0
+        while time.time() < kill_time and depth < 15:
+            value = node.alpha_beta_search(depth, kill_time=kill_time)
+            print(depth, round(value, 3), round(time.time() - start_time, 3))
+            depth += 1
+        if self.is_swappable() and node.value - self.score() < 0:
+            piece_id = -1
+        else:
+            piece_id = node.legal_moves[node.best_move_index]
+        self.play(piece_id)
 
     def get_search_root_node(
         self,
