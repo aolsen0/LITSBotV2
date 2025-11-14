@@ -138,11 +138,29 @@ def test_searchnode_alpha_beta():
     board._score_change = torch.tensordot(
         board._board_tensor, get_stacked_piece_tensor(5), dims=[[0, 1], [1, 2]]
     )
-    board.play(0)
 
     def model(tensor):
         print(tensor.shape)
         return torch.zeros(tensor.shape[0])
+
+    root = SearchNode(
+        board.board_size,
+        board.max_pieces_per_shape,
+        board._score_change,
+        None,
+        model,
+        True,
+        board.played_ids,
+        board.played_cells,
+        board.to_tensor(flip_xo=True),
+        None,
+        legal_moves=[101, 110],
+    )
+    assert root.alpha_beta_search(0) == 0.0
+    assert root.best_move_index == 1
+    assert root.alpha_beta_search(1) == -1.0
+    assert root.best_move_index == 0
+    board.play(0)
 
     original_alpha_beta_search = copy.deepcopy(SearchNode.alpha_beta_search)
     all_args = []

@@ -1,3 +1,4 @@
+import time
 from typing import Union
 import torch
 from src.board import LITSBoard
@@ -5,8 +6,8 @@ from src.model import LITSModel, MoveModel
 from src.piece_utils import build_piece_list
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DEPTH_0_CLIP = 1.0
-DEPTH_1_CLIP = 0.75
+DEPTH_0_CLIP = 1.6
+DEPTH_1_CLIP = 1.2
 
 
 class SearchNode:
@@ -69,8 +70,6 @@ class SearchNode:
             self.children_output = model(self.children_tensor.to(device)).to("cpu")
         if single_output:
             value = self.children_output.reshape(-1) + self.important_score_changes
-            self.value = -value.min().item()
-            self.best_move_index = value.argmin().item()
         else:
             score = (
                 torch.where(
@@ -83,24 +82,24 @@ class SearchNode:
             )
             score[score == -float("inf")] = 0.0
             value = score + self.important_score_changes
+        self.all_values = value
+        if self.played_pieces:
             self.value = -value.min().item()
             self.best_move_index = value.argmin().item()
+        else:
+            self.value = -value.abs().min().item()
+            self.best_move_index = value.abs().argmin().item()
 
-    def add_children(self):
+    def add_children(self) -> None:
         """Add children to the current node."""
+        if self.children:
+            return
         for i in range(self.children_tensor.shape[0]):
-            curr_output = self.children_output[i]
-            curr_value = (
-                curr_output.item()
-                if self.single_output
-                else torch.where(curr_output[1] > 0.5, curr_output[0], -float("inf"))
-                .max()
-                .item()
-            )
-            if curr_value == -float("inf"):
-                curr_value = 0.0
-            curr_value += self.important_score_changes[i].item()
-            if -curr_value < self.value - DEPTH_0_CLIP:
+            curr_output = self.children_output[i] if self.skip_legality_check else None
+            curr_value = self.all_values[i].item()
+            if (self.played_pieces and -curr_value < self.value - DEPTH_0_CLIP) or (
+                not self.played_pieces and -abs(curr_value) < self.value - DEPTH_0_CLIP
+            ):
                 self.children.append(None)
                 continue
             piece_id = self.legal_moves[i]
@@ -130,7 +129,8 @@ class SearchNode:
         alpha: float = -float("inf"),
         beta: float = float("inf"),
         alpha_player: bool = True,
-    ):
+        kill_time: float | None = None,
+    ) -> float:
         """
         Perform alpha-beta pruning search to the specified depth.
 
@@ -157,11 +157,17 @@ class SearchNode:
             for i, child in enumerate(self.children)
             if child is not None
         ]
-        child_values.sort(key=lambda x: x[1])
+        if self.played_pieces:
+            child_values.sort(key=lambda x: x[1])
+        else:
+            child_values.sort(key=lambda x: abs(x[1]))
         best_prior_value = child_values[0][1]
         for i, value in child_values:
             # these cases are probably never optimal moves, it's fine to delete them
-            if value > best_prior_value + DEPTH_1_CLIP:
+            if (self.played_pieces and value > best_prior_value + DEPTH_1_CLIP) or (
+                not self.played_pieces
+                and abs(value) > abs(best_prior_value) + DEPTH_1_CLIP
+            ):
                 self.children[i] = None
 
         best_value = -float("inf")
@@ -176,23 +182,33 @@ class SearchNode:
             next_score = self.important_score_changes[i].item()
             child_value = (
                 child.alpha_beta_search(
-                    depth - 1, alpha + next_score, beta + next_score, not alpha_player
+                    depth - 1,
+                    alpha + next_score,
+                    beta + next_score,
+                    not alpha_player,
+                    kill_time,
                 )
                 + next_score
             )
+            if not self.played_pieces:
+                child_value = abs(child_value)
 
             if -child_value > best_value:
                 best_value = -child_value
                 best_move_index = i
 
-            if alpha_player:
-                alpha = max(alpha, best_value)
-            else:
-                beta = min(beta, -best_value)
+                if alpha_player:
+                    alpha = max(alpha, best_value)
+                    if not self.played_pieces:
+                        beta = min(beta, -best_value)
+                else:
+                    beta = min(beta, -best_value)
 
-            # Prune if possible
-            if beta <= alpha:
-                print("broke")
+                # Prune if possible
+                if beta <= alpha:
+                    break
+
+            if kill_time is not None and time.time() >= kill_time:
                 break
 
         self.value = best_value
