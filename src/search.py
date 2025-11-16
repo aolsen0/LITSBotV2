@@ -60,21 +60,24 @@ class SearchNode:
         if not self.legal_moves:
             self.value = 0.0
             return
-        self.children_tensor = LITSBoard.to_children_tensor_static(
+        self.curr_tensor = curr_tensor
+        children_tensor = LITSBoard.to_children_tensor_static(
             board_size, curr_tensor, self.legal_moves
         )
         self.important_score_changes = self.score_changes[self.legal_moves]
         if len(played_pieces) % 2:
             self.important_score_changes = -self.important_score_changes
         with torch.no_grad():
-            self.children_output = model(self.children_tensor.to(device)).to("cpu")
+            children_output = model(children_tensor.to(device)).to("cpu")
+        if self.skip_legality_check:
+            self.children_output = children_output
         if single_output:
-            value = self.children_output.reshape(-1) + self.important_score_changes
+            value = children_output.reshape(-1) + self.important_score_changes
         else:
             score = (
                 torch.where(
-                    self.children_output[:, 1] > 0.5,
-                    self.children_output[:, 0],
+                    children_output[:, 1] > 0.5,
+                    children_output[:, 0],
                     -float("inf"),
                 )
                 .max(dim=1)
@@ -94,7 +97,10 @@ class SearchNode:
         """Add children to the current node."""
         if self.children:
             return
-        for i in range(self.children_tensor.shape[0]):
+        children_tensor = LITSBoard.to_children_tensor_static(
+            self.board_size, self.curr_tensor, self.legal_moves
+        )
+        for i, piece_id in enumerate(self.legal_moves):
             curr_output = self.children_output[i] if self.skip_legality_check else None
             curr_value = self.all_values[i].item()
             if (self.played_pieces and -curr_value < self.value - DEPTH_0_CLIP) or (
@@ -107,7 +113,7 @@ class SearchNode:
             played_cells = self.played_cells | set(
                 build_piece_list(self.board_size)[piece_id]
             )
-            curr_tensor = self.children_tensor[i]
+            curr_tensor = children_tensor[i]
             child_node = SearchNode(
                 self.board_size,
                 self.max_pieces_per_shape,
