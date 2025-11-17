@@ -116,7 +116,7 @@ class LITSGame:
                 return
         print("Enter the cells of the piece you want to play")
         while True:
-            user_cells = input().split()
+            user_cells = input().upper().split()
             if len(user_cells) == 8:
                 cells = [
                     (int(user_cells[i + 1]) - 1, ord(user_cells[i]) - ord("A"))
@@ -328,7 +328,12 @@ class LITSGame:
         depth = 0
         while time.time() < kill_time and depth < 15:
             value = node.alpha_beta_search(depth, kill_time=kill_time)
-            print(depth, round(value, 3), round(time.time() - start_time, 3))
+            print(
+                depth,
+                round(value, 3),
+                round(time.time() - start_time, 3),
+                node.legal_moves[node.best_move_index],
+            )
             depth += 1
         if self.is_swappable() and node.value - self.score() < 0:
             piece_id = -1

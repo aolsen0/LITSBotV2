@@ -104,7 +104,7 @@ class SearchNode:
             curr_output = self.children_output[i] if self.skip_legality_check else None
             curr_value = self.all_values[i].item()
             if (self.played_pieces and -curr_value < self.value - DEPTH_0_CLIP) or (
-                not self.played_pieces and -abs(curr_value) < self.value - DEPTH_0_CLIP
+                not self.played_pieces and -abs(curr_value) < self.value - 0.1
             ):
                 self.children.append(None)
                 continue
