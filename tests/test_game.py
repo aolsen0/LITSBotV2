@@ -87,6 +87,7 @@ def test_generate_examples():
     def model(tensor):
         return -5 * torch.tensor([list(range(tensor.shape[0]))]).to(device).T
 
+    model.single_output = True
     real_board = torch.tensor(
         [
             [0.0, -1.0, 0.0, -1.0],
@@ -135,6 +136,7 @@ def test_generate_examples():
             [tensor.shape[0], 2, 104]
         ).to(device)
 
+    model.single_output = False
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
 
     real_board = torch.tensor(
@@ -149,7 +151,7 @@ def test_generate_examples():
     game.board._score_change = torch.tensordot(
         game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
     )
-    example_in, example_out = game.generate_examples(model, 0.0, False)
+    example_in, example_out = game.generate_examples(model, 0.0)
     assert example_in.shape == (3, 5, 4, 4)
     assert example_out.shape == (3, 2, 104)
     assert example_out[0][1].sum() == 10
@@ -163,6 +165,8 @@ def test_play_best():
 
     def model(tensor):
         return -5 * torch.tensor([list(range(tensor.shape[0]))]).to(device).T
+
+    model.single_output = True
 
     real_board = torch.tensor(
         [
@@ -190,12 +194,14 @@ def test_play_best():
             [tensor.shape[0], 2, 104]
         ).to(device)
 
+    model.single_output = False
+
     game = LITSGame(board_size=4, num_xs=4, max_pieces_per_shape=1)
     game.board._board_tensor = real_board
     game.board._score_change = torch.tensordot(
         game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
     )
-    game.play_best(model, False)
+    game.play_best(model)
     assert game.board.played_ids == [0]
 
 
@@ -204,6 +210,8 @@ def test_game_evaluate():
 
     def model(tensor):
         return torch.tensor(-5.0)
+
+    model.single_output = True
 
     real_board = torch.tensor(
         [
@@ -232,9 +240,11 @@ def test_game_evaluate():
     def model(tensor):
         return torch.stack([score, legality], dim=0).unsqueeze(0)
 
+    model.single_output = False
+
     game.board._board_tensor = real_board
     game.board._score_change = torch.tensordot(
         game.board._board_tensor, get_stacked_piece_tensor(4), dims=[[0, 1], [1, 2]]
     ).tolist()
     game.play(0)
-    assert game.evaluate(model, False) == 2 - score[::2].max().item()
+    assert game.evaluate(model) == 2 - score[::2].max().item()

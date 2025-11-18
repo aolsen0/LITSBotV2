@@ -63,7 +63,7 @@ def train_move_model(model: MoveModel, games: int, epsilon: float, lr: float) ->
             max_pieces_per_shape=model.max_pieces_per_shape,
         )
         model.train()
-        inputs, value = game.generate_examples(model, epsilon, single_output=False)
+        inputs, value = game.generate_examples(model, epsilon)
         optimizer.zero_grad()
         output = model(inputs.to(device))
         loss = loss_fn(output, value.to(device))

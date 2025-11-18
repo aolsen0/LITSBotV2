@@ -1,13 +1,13 @@
 import torch
 from src.game import LITSGame
-from src.model import LITSModel, MoveModel
+from src.model import BaseLITSModel, MoveModel
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def compare_models(
-    model1: LITSModel | MoveModel, model2: LITSModel | MoveModel, num_games: int = 1
+    model1: BaseLITSModel, model2: BaseLITSModel, num_games: int = 1
 ) -> int:
     """Compare two models by playing several games against each other.
 
@@ -20,7 +20,7 @@ def compare_models(
         or model1.num_xs != model2.num_xs
         or model1.max_pieces_per_shape != model2.max_pieces_per_shape
     ):
-        raise ValueError("Models must have the  same game parameters")
+        raise ValueError("Models must have the same game parameters")
     model1 = model1.to(device)
     model2 = model2.to(device)
     wins = 0
@@ -36,19 +36,9 @@ def compare_models(
             first, second = model2, model1
         while not game.completed:
             if game.current_player == 0:
-                if isinstance(first, LITSModel):
-                    game.play_best(first)
-                elif isinstance(first, MoveModel):
-                    game.play_best(first, False)
-                else:
-                    raise ValueError("Invalid model type")
+                game.play_best(first)
             else:
-                if isinstance(second, LITSModel):
-                    game.play_best(second)
-                elif isinstance(second, MoveModel):
-                    game.play_best(second, False)
-                else:
-                    raise ValueError("Invalid model type")
+                game.play_best(second)
         if game.score() > 0 and i % 2 == 0 or game.score() < 0 and i % 2 == 1:
             wins += 1
     return wins
@@ -75,7 +65,7 @@ def legality_accuracy(
             num_xs=model.num_xs,
             max_pieces_per_shape=model.max_pieces_per_shape,
         )
-        inputs, outputs = game.generate_examples(model, epsilon, single_output=False)
+        inputs, outputs = game.generate_examples(model, epsilon)
         result = model(inputs.to(device))[:, 1]
         legal = outputs[:, 1]
         true_positives += torch.sum((result > 0.5) & (legal > 0.5)).item()

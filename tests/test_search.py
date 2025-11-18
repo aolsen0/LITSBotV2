@@ -27,13 +27,14 @@ def test_searchnode_init():
     def model(tensor):
         return -5 * torch.tensor([list(range(tensor.shape[0]))]).to(device).T
 
+    model.single_output = True
+
     parent_node = SearchNode(
         board.board_size,
         board.max_pieces_per_shape,
         board._score_change,
         None,
         model,
-        True,
         board.played_ids,
         board.played_cells,
         board.to_tensor(flip_xo=True),
@@ -49,7 +50,6 @@ def test_searchnode_init():
         board._score_change,
         parent_node,
         model,
-        True,
         board.played_ids,
         board.played_cells,
         board.to_tensor(flip_xo=False),
@@ -60,6 +60,8 @@ def test_searchnode_init():
     def other_model(tensor):
         return -torch.tensor(list(range(832))).to(device).reshape(4, 2, 104) / 100 + 4
 
+    other_model.single_output = False
+
     output = torch.zeros(2, 104)
     output[1, [76, 78, 100, 101]] = 1.0
 
@@ -69,7 +71,6 @@ def test_searchnode_init():
         board._score_change,
         parent_node,
         other_model,
-        False,
         board.played_ids,
         board.played_cells,
         board.to_tensor(flip_xo=False),
@@ -101,13 +102,14 @@ def test_searchnode_create_children():
     def model(tensor):
         return -5 * torch.tensor([list(range(tensor.shape[0]))]).to(device).T
 
+    model.single_output = True
+
     parent_node = SearchNode(
         board.board_size,
         board.max_pieces_per_shape,
         board._score_change,
         None,
         model,
-        True,
         board.played_ids,
         board.played_cells,
         board.to_tensor(flip_xo=True),
@@ -144,13 +146,14 @@ def test_searchnode_alpha_beta():
         print(tensor.shape)
         return torch.zeros(tensor.shape[0])
 
+    model.single_output = True
+
     root = SearchNode(
         board.board_size,
         board.max_pieces_per_shape,
         board._score_change,
         None,
         model,
-        True,
         board.played_ids,
         board.played_cells,
         board.to_tensor(flip_xo=True),
@@ -177,7 +180,6 @@ def test_searchnode_alpha_beta():
             board._score_change,
             None,
             model,
-            True,
             board.played_ids,
             board.played_cells,
             board.to_tensor(flip_xo=True),

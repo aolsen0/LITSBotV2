@@ -2,7 +2,7 @@ import time
 from typing import Union
 import torch
 from src.board import LITSBoard
-from src.model import LITSModel, MoveModel
+from src.model import BaseLITSModel, LITSModel, MoveModel
 from src.piece_utils import build_piece_list
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,8 +20,7 @@ class SearchNode:
         max_pieces_per_shape: int,
         score_changes: torch.Tensor,
         parent: Union["SearchNode", None],
-        model: LITSModel | MoveModel,
-        single_output: bool,
+        model: BaseLITSModel,
         played_pieces: list[int],
         played_cells: set[tuple[int, int]],
         curr_tensor: torch.Tensor,
@@ -35,11 +34,10 @@ class SearchNode:
         self.parent = parent
         self.children: list["SearchNode" | None] = []
         self.model = model
-        self.single_output = single_output
         self.played_pieces = played_pieces
         self.played_cells = played_cells
         self.skip_legality_check = skip_legality_check
-        if single_output and skip_legality_check:
+        if model.single_output and skip_legality_check:
             raise ValueError(
                 "Models with single output do not provide legality information."
             )
@@ -72,7 +70,7 @@ class SearchNode:
             children_output = model(children_tensor.to(device)).to("cpu")
         if self.skip_legality_check:
             self.children_output = children_output
-        if single_output:
+        if model.single_output:
             value = children_output.reshape(-1) + self.important_score_changes
         else:
             score = (
@@ -121,7 +119,6 @@ class SearchNode:
                 self.score_changes,
                 self,
                 self.model,
-                self.single_output,
                 played_pieces,
                 played_cells,
                 curr_tensor,

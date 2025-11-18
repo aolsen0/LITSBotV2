@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from src.board import LITSBoard
-from src.model import LITSModel, MoveModel
+from src.model import BaseLITSModel, LITSModel, MoveModel
 from src.piece_utils import get_total_number_of_pieces, map_cells_to_id
 from src.search import SearchNode
 
@@ -139,7 +139,7 @@ class LITSGame:
             )
 
     def generate_examples(
-        self, model: nn.Module, epsilon: float = 0.2, single_output: bool = True
+        self, model: BaseLITSModel, epsilon: float = 0.2
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate examples for training a reinforcement learning model.
 
@@ -148,12 +148,6 @@ class LITSGame:
         Args:
             model: The model to generate examples for.
             epsilon: The probability of choosing a random move instead of the best move.
-            single_output: Whether the model estimates the value of the current game
-                state, or the value of each possible move in the current game state.
-                Models estimating the value of each possible move should output a tensor
-                of shape (batch_size, 2, num_moves), where the first channel contains
-                the value of the game state after each move, and the second channel
-                contains the estimated legality of each move.
         Returns:
             - A tensor of inputs, where each input is a tensor representing the board
                 state.
@@ -162,7 +156,7 @@ class LITSGame:
         """
         if self.board.played_ids:
             raise ValueError("Cannot generate examples for a game in progress")
-
+        single_output = model.single_output
         # don't generate examples for the first move
         if random.random() < epsilon:
             piece_id = random.choice(self.board.valid_moves())
@@ -245,7 +239,7 @@ class LITSGame:
 
         return torch.stack(inputs), torch.stack(outputs)
 
-    def play_best(self, model: nn.Module, single_output: bool = True) -> None:
+    def play_best(self, model: BaseLITSModel) -> None:
         """Play the best move according to the given model.
 
         Assumes the model estimates future score changes, as suggested by the examples
@@ -256,7 +250,7 @@ class LITSGame:
         moves = self.board.valid_moves()
         flip = self.current_player ^ self.swapped
         children_tensor, score_changes = self.board.to_children_tensor(moves, not flip)
-        if single_output:
+        if model.single_output:
             with torch.no_grad():
                 values = model(children_tensor.to(device)) - score_changes.unsqueeze(
                     1
@@ -280,7 +274,7 @@ class LITSGame:
             piece_id = moves[values.argmin().item()]
         self.play(piece_id)
 
-    def evaluate(self, model: nn.Module, single_output: bool = True) -> float:
+    def evaluate(self, model: BaseLITSModel) -> float:
         """Evaluate the game state using the given model.
 
         Should not be expected to make sense before the second player has chosen whether
@@ -293,7 +287,7 @@ class LITSGame:
         """
         flip = self.current_player ^ self.swapped
         with torch.no_grad():
-            if single_output:
+            if model.single_output:
                 value = model(self.board.to_tensor(flip).unsqueeze(0).to(device)).item()
             else:
                 output = model(self.board.to_tensor(flip).unsqueeze(0).to(device))
@@ -306,13 +300,11 @@ class LITSGame:
             value = -value
         return self.score() + value
 
-    def play_against(
-        self, model: nn.Module, model_player: int = 1, single_output: bool = True
-    ) -> None:
+    def play_against(self, model: BaseLITSModel, model_player: int = 1) -> None:
         """Play a game against the given model."""
         while not self.completed:
             if self.current_player == model_player - 1:
-                self.play_best(model, single_output)
+                self.play_best(model)
             else:
                 self.prompt()
         print(self.board)
@@ -320,7 +312,7 @@ class LITSGame:
         print(f"Player {winner} wins")
         print(f"Score: {self.score()}")
 
-    def play_think(self, model: LITSModel | MoveModel, time_limit: float = 5.0) -> None:
+    def play_think(self, model: BaseLITSModel, time_limit: float = 5.0) -> None:
         """Use alpha-beta search to play the best move according to the given model."""
         start_time = time.time()
         kill_time = start_time + time_limit
@@ -343,7 +335,7 @@ class LITSGame:
 
     def get_search_root_node(
         self,
-        model: LITSModel | MoveModel,
+        model: BaseLITSModel,
         skip_legality_check: bool = False,
     ) -> SearchNode:
         return SearchNode(
@@ -352,7 +344,6 @@ class LITSGame:
             self.board._score_change,
             None,
             model,
-            isinstance(model, LITSModel),
             self.board.played_ids,
             self.board.played_cells,
             self.board.to_tensor(bool(len(self.board.played_ids) % 2)),
