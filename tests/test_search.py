@@ -121,6 +121,7 @@ def test_searchnode_create_children():
     assert child.played_pieces == [0, 52]
 
 
+@patch("src.search.MOVE_1_CLIP", 100.0)
 @patch("src.search.DEPTH_0_CLIP", 100.0)
 @patch("src.search.DEPTH_1_CLIP", 100.0)
 def test_searchnode_alpha_beta():

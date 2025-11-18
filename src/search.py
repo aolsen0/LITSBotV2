@@ -8,6 +8,7 @@ from src.piece_utils import build_piece_list
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEPTH_0_CLIP = 1.6
 DEPTH_1_CLIP = 1.2
+MOVE_1_CLIP = 0.1
 
 
 class SearchNode:
@@ -104,7 +105,7 @@ class SearchNode:
             curr_output = self.children_output[i] if self.skip_legality_check else None
             curr_value = self.all_values[i].item()
             if (self.played_pieces and -curr_value < self.value - DEPTH_0_CLIP) or (
-                not self.played_pieces and -abs(curr_value) < self.value - 0.1
+                not self.played_pieces and -abs(curr_value) < self.value - MOVE_1_CLIP
             ):
                 self.children.append(None)
                 continue
