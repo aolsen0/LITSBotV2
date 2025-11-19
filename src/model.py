@@ -19,6 +19,7 @@ class BaseLITSModel(nn.Module):
     - single_output: bool  # whether the model outputs a single value or additional
         legality information
     - board_size, num_xs, max_pieces_per_shape: int  # game parameters
+    - base_dir: str  # base directory to save/load models from
     """
 
     name: str
@@ -27,25 +28,23 @@ class BaseLITSModel(nn.Module):
     board_size: int
     num_xs: int
     max_pieces_per_shape: int
+    base_dir: str
 
     def __init__(self):
         super().__init__()
 
-    def save(self, identifier: str, base_dir: str = "models") -> None:
+    def get_model_dir(self) -> str:
+        """Get the directory where this model's files are stored."""
+        return os.path.join(self.base_dir, self.name)
+
+    def save(self, identifier: str) -> None:
         """Save model state_dict and metadata to models/[name]/.
 
         Args:
             identifier: Unique identifier for this model version, such as the number of
                 training games completed.
-            base_dir: Base directory to save models in.
         """
-        if not hasattr(self, "name"):
-            raise AttributeError("Model must define a 'name' attribute before saving.")
-        if not hasattr(self, "save_params"):
-            raise AttributeError(
-                "Model must define a 'save_params' attribute before saving."
-            )
-        model_dir = os.path.join(base_dir, self.name)
+        model_dir = self.get_model_dir()
         os.makedirs(model_dir, exist_ok=True)
 
         meta = {"class": self.__class__.__name__, "params": self.save_params}
@@ -88,7 +87,7 @@ class BaseLITSModel(nn.Module):
         if cls.__name__ != class_name:
             raise ValueError(f"Model {name} is a {class_name}, not a {cls.__name__}")
 
-        model = cls(name=name, **params)
+        model = cls(name=name, **params, base_dir=base_dir)
 
         state_path = os.path.join(model_dir, f"{identifier}.pt")
         if not os.path.exists(state_path):
@@ -108,11 +107,13 @@ class LITSModel(BaseLITSModel):
         max_pieces_per_shape: int,
         num_conv_layers: int,
         num_linear_layers: int,
+        base_dir: str = "models",
     ):
         if num_linear_layers == 0:
             raise ValueError("Model must have at least one linear layer")
         super().__init__()
         self.name = name
+        self.base_dir = base_dir
         self.single_output = True
         self.board_size = board_size
         self.num_xs = num_xs
@@ -170,11 +171,13 @@ class MoveModel(BaseLITSModel):
         max_pieces_per_shape: int,
         num_conv_layers: int,
         num_linear_layers: int,
+        base_dir: str = "models",
     ):
         if num_linear_layers == 0:
             raise ValueError("Model must have at least one layer")
         super().__init__()
         self.name = name
+        self.base_dir = base_dir
         self.single_output = False
         self.board_size = board_size
         self.num_xs = num_xs

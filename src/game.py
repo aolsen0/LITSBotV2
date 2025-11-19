@@ -171,7 +171,8 @@ class LITSGame:
                     ) - score_changes.unsqueeze(1).to(device)
                 piece_id = values.abs().argmin().item()
             else:
-                output = model(children_tensor.to(device))
+                with torch.no_grad():
+                    output = model(children_tensor.to(device))
                 score = (
                     torch.where(output[:, 1] > 0.5, output[:, 0], -float("inf"))
                     .max(dim=1)
