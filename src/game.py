@@ -1,10 +1,9 @@
 import random
 import time
 import torch
-import torch.nn as nn
 
 from src.board import LITSBoard
-from src.model import BaseLITSModel, LITSModel, MoveModel
+from src.model import BaseLITSModel
 from src.piece_utils import get_total_number_of_pieces, map_cells_to_id
 from src.search import SearchNode
 
@@ -313,7 +312,9 @@ class LITSGame:
         print(f"Player {winner} wins")
         print(f"Score: {self.score()}")
 
-    def play_think(self, model: BaseLITSModel, time_limit: float = 5.0) -> None:
+    def play_think(
+        self, model: BaseLITSModel, time_limit: float = 5.0, quiet: bool = False
+    ) -> None:
         """Use alpha-beta search to play the best move according to the given model."""
         start_time = time.time()
         kill_time = start_time + time_limit
@@ -321,12 +322,13 @@ class LITSGame:
         depth = 0
         while time.time() < kill_time and depth < 15:
             value = node.alpha_beta_search(depth, kill_time=kill_time)
-            print(
-                depth,
-                round(value, 3),
-                round(time.time() - start_time, 3),
-                node.legal_moves[node.best_move_index],
-            )
+            if not quiet:
+                print(
+                    depth,
+                    round(value, 3),
+                    round(time.time() - start_time, 3),
+                    node.legal_moves[node.best_move_index],
+                )
             depth += 1
         if self.is_swappable() and node.value - self.score() < 0:
             piece_id = -1

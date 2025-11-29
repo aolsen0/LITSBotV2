@@ -92,8 +92,9 @@ def test_save_load_lits_model():
             max_pieces_per_shape=8,
             num_conv_layers=2,
             num_linear_layers=2,
+            base_dir=temp_dir,
         )
-        model.save(identifier="test_checkpoint", base_dir=temp_dir)
+        model.save(identifier="test_checkpoint")
         board = LITSBoard(board_size=12)
         tensor, _ = board.to_children_tensor(list(range(32)))
         with torch.no_grad():
@@ -125,8 +126,9 @@ def test_save_load_move_model():
             max_pieces_per_shape=8,
             num_conv_layers=2,
             num_linear_layers=2,
+            base_dir=temp_dir,
         )
-        model.save(identifier="test_checkpoint", base_dir=temp_dir)
+        model.save(identifier="test_checkpoint")
         board = LITSBoard(board_size=12)
         tensor, _ = board.to_children_tensor(list(range(32)))
         with torch.no_grad():

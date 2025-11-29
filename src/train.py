@@ -16,6 +16,7 @@ def train_model(
     train_games: int,
     save_interval: int | None = None,
     output_interval: int = 1000,
+    speed_limit: float = 0.0,
 ) -> None:
     """Train a model to play Battle of LITS.
 
@@ -27,6 +28,7 @@ def train_model(
         train_games: The number of additional games to train the model on.
         save_interval: If provided, the number of games between saving the model.
         output_interval: The number of games between printing loss information.
+        speed_limit: If > 0, the minimum number of seconds each game should take.
     """
     model_dir = model.get_model_dir()
     os.makedirs(model_dir, exist_ok=True)
@@ -43,6 +45,15 @@ def train_model(
 
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    if start_games > 0:
+        identifier = f"{start_games}"
+        optimizer_path = os.path.join(model_dir, f"{identifier}_opt.pt")
+        if os.path.exists(optimizer_path):
+            optimizer.load_state_dict(torch.load(optimizer_path))
+            optimizer.param_groups[0]["lr"] = lr
+            log(f"Optimizer state loaded from {optimizer_path}")
+        else:
+            log(f"No optimizer state found at {optimizer_path}, starting fresh.")
     if model.single_output:
         loss_fn = nn.MSELoss()
     else:
@@ -55,7 +66,13 @@ def train_model(
 
     recent_losses = []
     start_time = time.time()
+    prev_time = start_time
     for game_num in range(start_games + 1, start_games + train_games + 1):
+        if speed_limit > 0.0:
+            elapsed = time.time() - prev_time
+            if elapsed < speed_limit:
+                time.sleep(speed_limit - elapsed)
+            prev_time = time.time()
         game = LITSGame(
             board_size=model.board_size,
             num_xs=model.num_xs,
@@ -82,4 +99,6 @@ def train_model(
         if save_interval is not None and game_num % save_interval == 0:
             identifier = f"{game_num}"
             model.save(identifier)
+            optimizer_path = os.path.join(model_dir, f"{identifier}_opt.pt")
+            torch.save(optimizer.state_dict(), optimizer_path)
             log(f"Model saved at game {game_num}")

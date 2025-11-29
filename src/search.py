@@ -2,7 +2,7 @@ import time
 from typing import Union
 import torch
 from src.board import LITSBoard
-from src.model import BaseLITSModel, LITSModel, MoveModel
+from src.model import BaseLITSModel
 from src.piece_utils import build_piece_list
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
