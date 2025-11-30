@@ -117,21 +117,30 @@ class LITSGame:
         while True:
             user_cells = input().upper().split()
             if len(user_cells) == 8:
-                cells = [
-                    (int(user_cells[i + 1]) - 1, ord(user_cells[i]) - ord("A"))
-                    for i in range(0, 8, 2)
-                ]
-                cells.sort()
-                try:
-                    piece_id = map_cells_to_id(self.board_size)[tuple(cells)]
-                except KeyError:
-                    print("Cells do not form a valid piece")
-                    continue
-                if not self.board.is_valid(piece_id):
-                    print("Not a valid move on the current board")
-                    continue
-                self.play(piece_id)
-                return
+                for i, val in enumerate(user_cells):
+                    if (i % 2) and not val.isnumeric():
+                        break
+                    if not (i % 2):
+                        if len(val) > 1 or ord(val) not in range(
+                            ord("A"), ord("A") + self.board_size
+                        ):
+                            break
+                else:
+                    cells = [
+                        (int(user_cells[i + 1]) - 1, ord(user_cells[i]) - ord("A"))
+                        for i in range(0, 8, 2)
+                    ]
+                    cells.sort()
+                    try:
+                        piece_id = map_cells_to_id(self.board_size)[tuple(cells)]
+                    except KeyError:
+                        print("Cells do not form a valid piece")
+                        continue
+                    if not self.board.is_valid(piece_id):
+                        print("Not a valid move on the current board")
+                        continue
+                    self.play(piece_id)
+                    return
             print(
                 "Invalid input, try again. Input should be four cells, in the format "
                 "'A 1 B 1 C 1 D 1'"
