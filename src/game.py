@@ -14,7 +14,11 @@ class LITSGame:
     """Represents the full game state of a game of battle of LITS"""
 
     def __init__(
-        self, board_size: int = 10, num_xs: int = 30, max_pieces_per_shape: int = 5
+        self,
+        board_size: int = 10,
+        num_xs: int = 30,
+        max_pieces_per_shape: int = 5,
+        xo_locations: list[list[tuple[int, int]]] | None = None,
     ):
         """Initializes game state with the given parameters.
 
@@ -25,11 +29,57 @@ class LITSGame:
             max_pieces_per_shape: Maximum number of pieces of each shape that can be
                 placed on the board.
         """
-        self.board = LITSBoard(board_size, num_xs, max_pieces_per_shape)
+        self.board = LITSBoard(board_size, num_xs, max_pieces_per_shape, xo_locations)
         self.board_size = board_size
         self.current_player = 0
         self.swapped = False
         self.completed = False
+
+    @staticmethod
+    def from_user_input_board(
+        board_size: int = 10,
+        num_xs: int = 30,
+        max_pieces_per_shape: int = 5,
+    ) -> "LITSGame":
+        """Create a game by receiving board input from the user.
+
+        Args:
+            board_size: Number of rows and columns in the board.
+            num_xs: Number (each) of Xs and Os to scatter on the board. They are
+                situated such that each X is opposite an O on the board.
+            max_pieces_per_shape: Maximum number of pieces of each shape that can be
+                placed on the board.
+        Returns:
+            The initialized game.
+        """
+        print(
+            f"Enter {board_size} lines of {board_size} characters, "
+            "each being X, O, or space."
+        )
+        x_locations = []
+        o_locations = []
+        for i in range(board_size):
+            while True:
+                line = input(f"Row {i + 1}: ")
+                if len(line) != board_size:
+                    print(f"Line must be {board_size} characters long")
+                    continue
+                for j, char in enumerate(line):
+                    if char == "X":
+                        x_locations.append((i, j))
+                    elif char == "O":
+                        o_locations.append((i, j))
+                    elif char != " ":
+                        print("Invalid character, use X, O, or space")
+                        break
+                else:
+                    break
+        return LITSGame(
+            board_size,
+            num_xs,
+            max_pieces_per_shape,
+            [x_locations, o_locations],
+        )
 
     def __str__(self) -> str:
         tensor = self.board.to_tensor()

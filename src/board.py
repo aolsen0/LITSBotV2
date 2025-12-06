@@ -22,7 +22,11 @@ class LITSBoard:
     """Represents the board state of a game of Battle of LITS."""
 
     def __init__(
-        self, board_size: int = 10, num_xs: int = 30, max_pieces_per_shape: int = 5
+        self,
+        board_size: int = 10,
+        num_xs: int = 30,
+        max_pieces_per_shape: int = 5,
+        xo_locations: list[list[tuple[int, int]]] | None = None,
     ):
         """Initializes board state with the given parameters.
 
@@ -40,18 +44,29 @@ class LITSBoard:
         self.num_xs = num_xs
         self.max_pieces_per_shape = max_pieces_per_shape
         board_tensor = torch.zeros(board_size, board_size)
-        for _ in range(num_xs):
-            while True:
-                row = random.randrange(board_size)
-                col = random.randrange(board_size)
-                if board_tensor[row, col] != 0:
-                    continue
-                # you cant have a symbol in the middle of an odd-length board
-                if row == col == (board_size - 1) / 2:
-                    continue
+        if xo_locations is not None:
+            x_loc, o_loc = xo_locations
+            if len(set(x_loc)) != num_xs or len(set(o_loc)) != num_xs:
+                raise ValueError("wrong number of Xs or Os given")
+            if len(set(x_loc) & set(o_loc)) != 0:
+                raise ValueError("X and O locations cannot overlap")
+            for row, col in x_loc:
                 board_tensor[row, col] = 1.0
-                board_tensor[board_size - 1 - row, board_size - 1 - col] = -1.0
-                break
+            for row, col in o_loc:
+                board_tensor[row, col] = -1.0
+        else:
+            for _ in range(num_xs):
+                while True:
+                    row = random.randrange(board_size)
+                    col = random.randrange(board_size)
+                    if board_tensor[row, col] != 0:
+                        continue
+                    # you cant have a symbol in the middle of an odd-length board
+                    if row == col == (board_size - 1) / 2:
+                        continue
+                    board_tensor[row, col] = 1.0
+                    board_tensor[board_size - 1 - row, board_size - 1 - col] = -1.0
+                    break
         self._board_tensor = board_tensor
         self._piece_tensors = {
             piece_type: torch.zeros(board_size, board_size)
