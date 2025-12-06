@@ -6,9 +6,14 @@ from src.model import BaseLITSModel
 from src.piece_utils import build_piece_list
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DEPTH_0_CLIP = 1.6
-DEPTH_1_CLIP = 1.2
-MOVE_1_CLIP = 0.1
+
+
+def cutoff_threshold(moves_played: int, depth: int) -> float:
+    if moves_played == 0 and depth == 0:
+        return 0.07
+    if depth > 0:
+        return 1.2 + max(0, moves_played - 7) * 0.15
+    return 1.6 + max(0, moves_played - 7) * 0.2
 
 
 class SearchNode:
@@ -102,8 +107,9 @@ class SearchNode:
         for i, piece_id in enumerate(self.legal_moves):
             curr_output = self.children_output[i] if self.skip_legality_check else None
             curr_value = self.all_values[i].item()
-            if (self.played_pieces and -curr_value < self.value - DEPTH_0_CLIP) or (
-                not self.played_pieces and -abs(curr_value) < self.value - MOVE_1_CLIP
+            buffer = cutoff_threshold(len(self.played_pieces), 0)
+            if (self.played_pieces and -curr_value < self.value - buffer) or (
+                not self.played_pieces and -abs(curr_value) < self.value - buffer
             ):
                 self.children.append(None)
                 continue
@@ -142,11 +148,12 @@ class SearchNode:
             depth: Maximum depth to search
             alpha: Alpha value for pruning
             beta: Beta value for pruning
-            maximizing_player: Whether current player is maximizing
+            alpha_player: Whether the current player is maximizing alpha or minimizing
+                beta
+            kill_time: Optional time to stop the search at
 
         Returns:
-            Tuple of (best_value, best_move_index) where best_move_index is the index
-            in self.legal_moves corresponding to the best move
+            Value of the current position for the current player
         """
         if depth == 0 or not self.legal_moves:
             return self.value
@@ -167,12 +174,17 @@ class SearchNode:
             child_values.sort(key=lambda x: abs(x[1]))
         best_prior_value = child_values[0][1]
         for i, value in child_values:
+            buffer = cutoff_threshold(len(self.played_pieces), depth)
             # these cases are probably never optimal moves, it's fine to delete them
-            if (self.played_pieces and value > best_prior_value + DEPTH_1_CLIP) or (
-                not self.played_pieces
-                and abs(value) > abs(best_prior_value) + DEPTH_1_CLIP
+            if (self.played_pieces and value > best_prior_value + buffer) or (
+                not self.played_pieces and abs(value) > abs(best_prior_value) + buffer
             ):
                 self.children[i] = None
+
+        if depth == 1:
+            self.best_move_index = child_values[0][0]
+            self.value = -child_values[0][1]
+            return self.value
 
         best_value = -float("inf")
         best_move_index = None
@@ -184,11 +196,17 @@ class SearchNode:
 
             # Recursively search child node
             next_score = self.important_score_changes[i].item()
+            if alpha_player:
+                adj_alpha = alpha + next_score
+                adj_beta = beta + next_score
+            else:
+                adj_alpha = alpha - next_score
+                adj_beta = beta - next_score
             child_value = (
                 child.alpha_beta_search(
                     depth - 1,
-                    alpha + next_score,
-                    beta + next_score,
+                    adj_alpha,
+                    adj_beta,
                     not alpha_player,
                     kill_time,
                 )
@@ -196,6 +214,13 @@ class SearchNode:
             )
             if not self.played_pieces:
                 child_value = abs(child_value)
+
+            if (
+                kill_time is not None
+                and time.time() >= kill_time
+                and best_move_index is not None
+            ):
+                break
 
             if -child_value > best_value:
                 best_value = -child_value
@@ -217,5 +242,4 @@ class SearchNode:
 
         self.value = best_value
         self.best_move_index = best_move_index
-
         return best_value
