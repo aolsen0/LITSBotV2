@@ -12,8 +12,8 @@ Battle of LITS is an abstract strategy game developed by Grant Fikes in 2011. Th
 
 ## Improvements over v1
 
- - More readable code
- - A single model for positional evaluation, trained to predict the highest/lowest evaluations (by itself) after 1 move. I hope this will work
- - Use torch.no_grad() during actual play
- - Train for longer
- - C++ implementation of the game tree search. It is probably possible to do this efficiently enough to make the positional evaluation model obsolete.
+ - More readable code.
+ - Better performance in computing which moves are legal in any position. This is impactful, as this constitutes most of the computation time during play outside of running ML models for positional evaluation.
+ - Instead of having a suite of models for positional evaluation, each trained to predict the best value of the previous one after one move, have a single RL model to predict the score changes for the entire remainder of the game. This is much more stable across turns and thus does much better at maing the first move with the pie rule in play.
+ - Use torch.no_grad() during actual play.
+ - Train for longer.
