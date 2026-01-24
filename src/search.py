@@ -62,7 +62,7 @@ class SearchNode:
                     played_cells,
                 )
         if not self.legal_moves:
-            self.value = 0.0
+            self.value = -0.1
             return
         self.curr_tensor = curr_tensor
         children_tensor = LITSBoard.to_children_tensor_static(
@@ -236,6 +236,9 @@ class SearchNode:
                 # Prune if possible
                 if beta <= alpha:
                     break
+            else:
+                # small adjustment to break ties in end of game searches
+                child.value += 1e-11
 
             if kill_time is not None and time.time() >= kill_time:
                 break

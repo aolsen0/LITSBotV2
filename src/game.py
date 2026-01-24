@@ -378,13 +378,14 @@ class LITSGame:
         start_time = time.time()
         kill_time = start_time + time_limit
         node = self.get_search_root_node(model)
+        prev_value = self.score() if self.current_player == 0 else -self.score()
         depth = 0
         while time.time() < kill_time and depth < 15:
             value = node.alpha_beta_search(depth, kill_time=kill_time)
             if not quiet:
                 print(
                     depth,
-                    round(value, 3),
+                    round(prev_value + value, 3),
                     round(time.time() - start_time, 3),
                     node.legal_moves[node.best_move_index],
                 )
